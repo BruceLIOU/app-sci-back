@@ -476,45 +476,105 @@ export async function generateEtatDesLieuxPdf(inspection: any, property: any, te
   paragraph(doc, 'Nombre de clés remises : ______  |  Télécommande(s) : ______  |  Digicode : ______')
   paragraph(doc, 'Relevés des compteurs — Électricité : ________  |  Eau froide : ________  |  Eau chaude : ________  |  Gaz : ________')
 
-  // Pièces
-  let rooms: any[] = []
-  try { rooms = inspection.rooms ? JSON.parse(inspection.rooms) : [] } catch {}
+  // Pièces du bien (property.rooms = [{type, count, area}])
+  let propRooms: any[] = []
+  try { propRooms = property?.rooms ? JSON.parse(property.rooms) : [] } catch {}
+  // Fallback : inspection.rooms (anciennes données) → [{name, condition, notes}]
+  const legacyRooms: any[] = []
+  if (propRooms.length === 0) {
+    try {
+      const parsed = inspection.rooms ? JSON.parse(inspection.rooms) : []
+      legacyRooms.push(...parsed)
+    } catch {}
+  }
+
+  // ── Helper : dessine un bloc pièce avec grille ALUR ────────────────────────
+  const drawRoomBlock = (title: string, condition?: string, observations?: string) => {
+    const pageW = doc.page.width
+    const gridItems = [
+      ['Murs / peinture', 'Sol / revêtement'],
+      ['Plafond', 'Portes / fenêtres'],
+      ['Volets / stores', 'Équipements'],
+    ]
+    const blockH = 20 + 14 + 14 + gridItems.length * 16 + 6
+    if (doc.y + blockH > doc.page.height - 60) { doc.addPage(); doc.y = 50 }
+
+    // En-tête de la pièce
+    const hY = doc.y + 6
+    doc.rect(45, hY, pageW - 90, 18).fill('#dce3ec')
+    doc.fillColor(BLUE).fontSize(10).font('Helvetica-Bold')
+      .text(title, 50, hY + 4, { width: pageW - 100, lineBreak: false })
+    doc.y = hY + 22
+    doc.fillColor('#000000')
+
+    // Ligne État général
+    const eY = doc.y
+    doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+      .text('État général :', 50, eY + 1, { width: 90, lineBreak: false })
+    if (condition) {
+      const condRgb = conditionColor[condition]
+      if (condRgb) {
+        const [r, g, b] = condRgb.split(',').map(Number)
+        doc.fillColor([r, g, b]).fontSize(8).font('Helvetica-Bold')
+          .text(condition, 148, eY + 1, { width: pageW - 193, lineBreak: false })
+        doc.fillColor('#000000')
+      } else {
+        doc.fillColor('#000000').fontSize(8).font('Helvetica')
+          .text(condition, 148, eY + 1, { width: pageW - 193, lineBreak: false })
+      }
+    } else {
+      doc.moveTo(148, eY + 10).lineTo(pageW - 45, eY + 10).strokeColor(LINE).lineWidth(0.4).stroke()
+    }
+    doc.y = eY + 14
+
+    // Ligne Observations
+    const oY = doc.y
+    doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+      .text('Observations :', 50, oY + 1, { width: 90, lineBreak: false })
+    if (observations) {
+      doc.fillColor('#000000').fontSize(8).font('Helvetica')
+        .text(observations, 148, oY + 1, { width: pageW - 193, lineBreak: false })
+    } else {
+      doc.moveTo(148, oY + 10).lineTo(pageW - 45, oY + 10).strokeColor(LINE).lineWidth(0.4).stroke()
+    }
+    doc.y = oY + 14
+
+    // Grille 2 colonnes
+    const colW = (pageW - 90) / 2
+    gridItems.forEach(([left, right]) => {
+      const gY = doc.y
+      // Colonne gauche
+      doc.fillColor(GRAY).fontSize(7.5).font('Helvetica')
+        .text(`${left} :`, 50, gY + 2, { width: 85, lineBreak: false })
+      doc.moveTo(140, gY + 10).lineTo(45 + colW - 4, gY + 10).strokeColor(LINE).lineWidth(0.3).stroke()
+      // Colonne droite
+      if (right) {
+        doc.fillColor(GRAY).fontSize(7.5).font('Helvetica')
+          .text(`${right} :`, 45 + colW + 4, gY + 2, { width: 85, lineBreak: false })
+        doc.moveTo(45 + colW + 95, gY + 10).lineTo(pageW - 45, gY + 10).strokeColor(LINE).lineWidth(0.3).stroke()
+      }
+      doc.y = gY + 16
+    })
+
+    doc.fillColor('#000000')
+    doc.y += 2
+  }
 
   section(doc, 'V. État des pièces')
 
-  if (rooms.length === 0) {
-    paragraph(doc, 'Aucune pièce enregistrée.')
+  if (propRooms.length === 0 && legacyRooms.length === 0) {
+    paragraph(doc, 'Aucune pièce à décrire.')
+  } else if (legacyRooms.length > 0) {
+    for (const room of legacyRooms) {
+      drawRoomBlock(room.name || 'Pièce', room.condition, room.notes)
+    }
   } else {
-    for (const room of rooms) {
-      doc.moveDown(0.3)
-      // Titre de la pièce
-      doc.rect(45, doc.y, doc.page.width - 90, 16).fill('#e8ecf0')
-      doc.fillColor(BLUE).fontSize(9).font('Helvetica-Bold')
-        .text(room.name || 'Pièce', 50, doc.y - 12, { width: doc.page.width - 100 })
-      doc.fillColor('#000000').moveDown(0.2)
-
-      // État
-      const condRgb = conditionColor[room.condition]
-      if (condRgb) {
-        const [r, g, b] = condRgb.split(',').map(Number)
-        doc.fillColor([r, g, b]).fontSize(9).font('Helvetica-Bold')
-          .text(`État : ${room.condition}`, 50, doc.y)
-        doc.fillColor('#000000')
-      } else {
-        row(doc, 'État', room.condition || '—')
+    for (const pRoom of propRooms) {
+      const numRooms = typeof pRoom.count === 'number' && pRoom.count > 1 ? pRoom.count : 1
+      for (let rc = 0; rc < numRooms; rc++) {
+        const roomTitle = `${pRoom.type || 'Pièce'}${numRooms > 1 ? ` n°${rc + 1}` : ''}${pRoom.area ? ` (${pRoom.area} m²)` : ''}`
+        drawRoomBlock(roomTitle)
       }
-
-      if (room.notes) row(doc, 'Observations', room.notes)
-
-      // Grille d'observations standardisée (loi ALUR)
-      const items = ['Murs / peinture', 'Sol / revêtement', 'Plafond', 'Portes / fenêtres', 'Volets / stores', 'Équipements']
-      doc.moveDown(0.2)
-      items.forEach((item) => {
-        doc.fillColor(GRAY).fontSize(8).font('Helvetica')
-          .text(`${item} : `, 55, doc.y, { continued: true, width: 140 })
-        doc.moveTo(155, doc.y + 6).lineTo(doc.page.width - 45, doc.y + 6).strokeColor(LINE).lineWidth(0.3).stroke()
-        doc.fillColor('#000000').moveDown(0.5)
-      })
     }
   }
 

@@ -68,7 +68,7 @@ const leaseInclude = [
 ]
 
 const inspectionInclude = [
-  { model: db.Property, attributes: ['id', 'type', 'address', 'zipcode', 'city', 'area', 'pieces'] },
+  { model: db.Property, attributes: ['id', 'type', 'address', 'zipcode', 'city', 'area', 'pieces', 'rooms'] },
   { model: db.Tenant, attributes: ['id', 'civility', 'firstname', 'lastname', 'email', 'mobile'] },
 ]
 

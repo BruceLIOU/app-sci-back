@@ -1,6 +1,19 @@
 import { Request, Response } from 'express'
+import cloudinary from '../config/cloudinary.config'
 const db = require('../models')
 const { Quittance, Tenant, Property, Lease } = db
+const Document = db.Document
+
+const getPublicId = (url: string): string => {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/i)
+  return match ? match[1] : ''
+}
+
+async function deleteEntityDocuments(entity_type: string, entity_id: number) {
+  const docs = await Document.findAll({ where: { entity_type, entity_id } })
+  await Promise.all(docs.map((d: any) => cloudinary.uploader.destroy(getPublicId(d.file_url), { resource_type: 'raw' })))
+  await Document.destroy({ where: { entity_type, entity_id } })
+}
 
 const include = [
   { model: Tenant, attributes: ['id', 'civility', 'firstname', 'lastname', 'email', 'mobile'] },
@@ -49,8 +62,10 @@ exports.update = async (req: Request, res: Response) => {
 }
 
 exports.delete = async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
   try {
-    const num = await Quittance.destroy({ where: { id: req.params.id } })
+    await deleteEntityDocuments('quittance', id)
+    const num = await Quittance.destroy({ where: { id } })
     if (num === 1) return res.status(200).json({ message: 'Quittance supprimée.', isDeleted: true })
     res.status(404).json({ message: 'Quittance introuvable.', isDeleted: false })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
