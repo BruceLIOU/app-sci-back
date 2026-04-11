@@ -94,3 +94,32 @@ exports.delete = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Erreur lors de la suppression du document id=' + id })
   }
 }
+
+exports.download = async (req: Request, res: Response) => {
+  const id = req.params.id
+  try {
+    const doc = await Document.findByPk(id)
+    if (!doc) return res.status(404).json({ message: `Document id=${id} introuvable.` })
+    if (!doc.file_url) return res.status(404).json({ message: 'URL de fichier manquante.' })
+
+    const publicId = getPublicId(doc.file_url)
+    if (!publicId) return res.status(500).json({ message: 'Identifiant Cloudinary introuvable.' })
+
+    const ext = (doc.file_url.split('.').pop() || '').toLowerCase()
+    // For raw resources, Cloudinary stores the extension as part of the public_id
+    const fullPublicId = ext ? `${publicId}.${ext}` : publicId
+    const safeName = (doc.file_name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_')
+
+    // private_download_url uses the Admin API endpoint (api.cloudinary.com)
+    // which authenticates as account owner, bypassing CDN ACL restrictions
+    const downloadUrl = cloudinary.utils.private_download_url(fullPublicId, '', {
+      resource_type: 'raw',
+      type: 'upload',
+      attachment: safeName,
+    })
+
+    return res.redirect(downloadUrl)
+  } catch (error: any) {
+    res.status(500).json({ message: error.message })
+  }
+}

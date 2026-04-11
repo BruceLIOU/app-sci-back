@@ -31,6 +31,8 @@ require('./routes/quittance.routes')(app)
 require('./routes/inspection.routes')(app)
 require('./routes/associate.routes')(app)
 require('./routes/document.routes')(app)
+require('./routes/pdf.routes')(app)
+require('./routes/sci_config.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {
