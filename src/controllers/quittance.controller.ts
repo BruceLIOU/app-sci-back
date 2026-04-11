@@ -11,7 +11,7 @@ const getPublicId = (url: string): string => {
 
 async function deleteEntityDocuments(entity_type: string, entity_id: number) {
   const docs = await Document.findAll({ where: { entity_type, entity_id } })
-  await Promise.all(docs.map((d: any) => cloudinary.uploader.destroy(getPublicId(d.file_url), { resource_type: 'raw' })))
+  await Promise.allSettled(docs.map((d: any) => cloudinary.uploader.destroy(getPublicId(d.file_url), { resource_type: 'raw' })))
   await Document.destroy({ where: { entity_type, entity_id } })
 }
 
