@@ -22,6 +22,27 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
       area: {
         type: DataTypes.INTEGER,
       },
+      thumbnail: {
+        type: DataTypes.STRING,
+      },
+      images: {
+        type: DataTypes.TEXT,
+      },
+      rooms: {
+        type: DataTypes.TEXT,
+      },
+      features: {
+        type: DataTypes.TEXT,
+      },
+      comments: {
+        type: DataTypes.TEXT,
+      },
+      latitude: {
+        type: DataTypes.FLOAT,
+      },
+      longitude: {
+        type: DataTypes.FLOAT,
+      },
     },
     {}
   )

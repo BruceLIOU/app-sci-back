@@ -1,40 +1,68 @@
 import { Request, Response } from 'express'
+import cloudinary from '../config/cloudinary.config'
 
 const db = require('../models')
 const Property = db.Property
 
+interface FormidableFile {
+  name: string
+  path: string
+  size: number
+  type: string
+}
+
+const uploadToCloudinary = async (file: FormidableFile): Promise<string> => {
+  const result = await cloudinary.uploader.upload(file.path, {
+    folder: 'sci/properties',
+    resource_type: 'image',
+  })
+  return result.secure_url
+}
+
 exports.create = async (req: Request, res: Response) => {
-  if (!req.fields.city) {
-    res.status(400).send({
-      message: 'City can not be empty!',
-    })
+  if (!req.fields?.city) {
+    res.status(400).send({ message: 'City can not be empty!' })
     return
   }
 
-  const property = {
-    address: req.fields.address,
-    zipcode: req.fields.zipcode,
-    city: req.fields.city,
-    type: req.fields.type,
-    pieces: req.fields.pieces,
-    area: req.fields.area,
-  }
-
   try {
-    const result = await Property.create(property)
+    let thumbnailUrl: string | null = null
+    let imagesUrls: string[] = []
 
-    if (result) {
-      res.status(201).json(result)
-    } else {
-      res.status(500).json({
-        message: `Cannot create Property. Maybe Property req.fields is empty!`,
-      })
+    if (req.files?.thumbnail) {
+      thumbnailUrl = await uploadToCloudinary(req.files.thumbnail as FormidableFile)
     }
+
+    if (req.files?.images) {
+      const imgs = req.files.images
+      const imgArray = Array.isArray(imgs) ? imgs : [imgs as FormidableFile]
+      imagesUrls = await Promise.all(imgArray.map(uploadToCloudinary))
+    }
+
+    const lat = req.fields?.latitude ? parseFloat(String(req.fields.latitude)) : null
+    const lng = req.fields?.longitude ? parseFloat(String(req.fields.longitude)) : null
+
+    const property = {
+      address:   req.fields.address,
+      zipcode:   req.fields.zipcode,
+      city:      req.fields.city,
+      type:      req.fields.type,
+      pieces:    req.fields.pieces,
+      area:      req.fields.area,
+      latitude:  lat,
+      longitude: lng,
+      thumbnail: thumbnailUrl,
+      images:    imagesUrls.length ? JSON.stringify(imagesUrls) : null,
+      rooms:     req.fields.rooms ? String(req.fields.rooms) : null,
+      features:  req.fields.features ? String(req.fields.features) : null,
+      comments:  req.fields.comments ? String(req.fields.comments) : null,
+    }
+
+    const result = await Property.create(property)
+    res.status(201).json(result)
   } catch (error: any) {
     console.log(error.message)
-    res.status(500).json({
-      message: 'Error creating Property.',
-    })
+    res.status(500).json({ message: 'Error creating Property.' })
   }
 }
 
@@ -65,30 +93,42 @@ exports.findOne = async (req: Request, res: Response) => {
 }
 
 exports.update = async (req: Request, res: Response) => {
-  const { address, zipcode, city, type, pieces, area } = req.fields
-  const { thumbnail, images } = req.files
   const id = req.params.id
   try {
-    const result = await Property.update(
-      { address, zipcode, city, type, pieces, area, thumbnail, images },
-      {
-        where: { id: id },
-      }
-    )
-    if (result.length > 0) {
-      res.status(201).json({
-        message: 'Property was updated successfully.',
-      })
+    const updateData: Record<string, any> = {}
+
+    const scalarFields = ['address', 'zipcode', 'city', 'type', 'pieces', 'area', 'rooms', 'features', 'comments'] as const
+    scalarFields.forEach((f) => {
+      if (req.fields?.[f] !== undefined) updateData[f] = req.fields[f]
+    })
+
+    if (req.fields?.latitude !== undefined && req.fields.latitude !== '') {
+      updateData.latitude = parseFloat(String(req.fields.latitude))
+    }
+    if (req.fields?.longitude !== undefined && req.fields.longitude !== '') {
+      updateData.longitude = parseFloat(String(req.fields.longitude))
+    }
+
+    if (req.files?.thumbnail) {
+      updateData.thumbnail = await uploadToCloudinary(req.files.thumbnail as FormidableFile)
+    }
+
+    if (req.files?.images) {
+      const imgs = req.files.images
+      const imgArray = Array.isArray(imgs) ? imgs : [imgs as FormidableFile]
+      const urls = await Promise.all(imgArray.map(uploadToCloudinary))
+      updateData.images = JSON.stringify(urls)
+    }
+
+    const [count] = await Property.update(updateData, { where: { id } })
+    if (count > 0) {
+      res.status(200).json({ message: 'Property was updated successfully.' })
     } else {
-      res.status(500).json({
-        message: `Cannot update Property with id=${id}. Maybe Property was not found or req.fields is empty!`,
-      })
+      res.status(404).json({ message: `Cannot update Property with id=${id}. Not found.` })
     }
   } catch (error: any) {
     console.log(error.message)
-    res.status(500).json({
-      message: 'Error updating Property with id=' + id,
-    })
+    res.status(500).json({ message: 'Error updating Property with id=' + id })
   }
 }
 

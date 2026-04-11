@@ -11,6 +11,7 @@
   "author": "Bruce LIOU",
   "license": "MIT",
   "dependencies": {
+    "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
