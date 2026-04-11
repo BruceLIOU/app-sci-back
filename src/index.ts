@@ -33,6 +33,7 @@ require('./routes/associate.routes')(app)
 require('./routes/document.routes')(app)
 require('./routes/pdf.routes')(app)
 require('./routes/sci_config.routes')(app)
+require('./routes/visit.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {

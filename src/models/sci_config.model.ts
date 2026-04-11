@@ -17,6 +17,8 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     manager_lastname: { type: DataTypes.STRING, defaultValue: '' },
     manager_email: { type: DataTypes.STRING, allowNull: true },
     manager_phone: { type: DataTypes.STRING, allowNull: true },
+    // Google Calendar
+    google_refresh_token: { type: DataTypes.TEXT, allowNull: true },
   }, {})
 
   return SciConfig
