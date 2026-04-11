@@ -19,6 +19,20 @@ const uploadToCloudinary = async (file: FormidableFile): Promise<string> => {
   return result.secure_url
 }
 
+// Extrait le public_id depuis une URL Cloudinary
+const getPublicId = (url: string): string => {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/i)
+  return match ? match[1] : ''
+}
+
+const destroyCloudinaryImages = async (urls: (string | null | undefined)[]): Promise<void> => {
+  await Promise.allSettled(
+    urls
+      .filter((u): u is string => !!u)
+      .map((u) => cloudinary.uploader.destroy(getPublicId(u)))
+  )
+}
+
 exports.create = async (req: Request, res: Response) => {
   if (!req.fields?.city) {
     res.status(400).send({ message: 'City can not be empty!' })
@@ -110,14 +124,38 @@ exports.update = async (req: Request, res: Response) => {
     }
 
     if (req.files?.thumbnail) {
+      // Remplace : supprimer l'ancienne vignette sur Cloudinary
+      const existing = await Property.findByPk(id)
+      if (existing?.thumbnail) await destroyCloudinaryImages([existing.thumbnail])
       updateData.thumbnail = await uploadToCloudinary(req.files.thumbnail as FormidableFile)
+    } else if (req.fields?.removeThumbnail === 'true') {
+      // Suppression sans remplacement
+      const existing = await Property.findByPk(id)
+      if (existing?.thumbnail) await destroyCloudinaryImages([existing.thumbnail])
+      updateData.thumbnail = null
     }
 
     if (req.files?.images) {
+      // Remplace toute la galerie : supprimer les anciennes
+      const existing = await Property.findByPk(id)
+      if (existing?.images) {
+        const oldUrls: string[] = (() => { try { return JSON.parse(existing.images) } catch { return [] } })()
+        await destroyCloudinaryImages(oldUrls)
+      }
       const imgs = req.files.images
       const imgArray = Array.isArray(imgs) ? imgs : [imgs as FormidableFile]
       const urls = await Promise.all(imgArray.map(uploadToCloudinary))
       updateData.images = JSON.stringify(urls)
+    } else if (req.fields?.keepImages !== undefined) {
+      // Certaines images ont été retirées : supprimer celles absentes de keepImages
+      const existing = await Property.findByPk(id)
+      if (existing?.images) {
+        const oldUrls: string[] = (() => { try { return JSON.parse(existing.images) } catch { return [] } })()
+        const keptUrls: string[] = (() => { try { return JSON.parse(String(req.fields.keepImages)) } catch { return [] } })()
+        const toDelete = oldUrls.filter((u) => !keptUrls.includes(u))
+        await destroyCloudinaryImages(toDelete)
+      }
+      updateData.images = String(req.fields.keepImages)
     }
 
     const [count] = await Property.update(updateData, { where: { id } })
@@ -134,27 +172,21 @@ exports.update = async (req: Request, res: Response) => {
 
 exports.delete = async (req: Request, res: Response) => {
   const id = req.params.id
-  await Property.destroy({
-    where: { id: id },
-  })
-    .then((num: number) => {
-      if (num == 1) {
-        res.status(201).json({
-          message: 'Property was deleted successfully!',
-          isDeleted: true,
-        })
-      } else {
-        res.status(500).json({
-          message: `Cannot delete Property with id=${id}. Maybe Property was not found!`,
-          isDeleted: false,
-        })
-      }
-    })
-    .catch((err: any) => {
-      res.status(500).send({
-        message: 'Could not delete Property with id=' + id,
-      })
-    })
+  try {
+    const existing = await Property.findByPk(id)
+    if (existing) {
+      const galleryUrls: string[] = (() => { try { return JSON.parse(existing.images || '[]') } catch { return [] } })()
+      await destroyCloudinaryImages([existing.thumbnail, ...galleryUrls])
+    }
+    const num = await Property.destroy({ where: { id } })
+    if (num === 1) {
+      res.status(201).json({ message: 'Property was deleted successfully!', isDeleted: true })
+    } else {
+      res.status(500).json({ message: `Cannot delete Property with id=${id}. Maybe Property was not found!`, isDeleted: false })
+    }
+  } catch (err: any) {
+    res.status(500).send({ message: 'Could not delete Property with id=' + id })
+  }
 }
 
 exports.deleteAll = async (req: Request, res: Response) => {
