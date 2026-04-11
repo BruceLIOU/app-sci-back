@@ -1,6 +1,7 @@
 # Dependencies
+node_modules/*
 node_modules/
-
+node_modules
 # Environment — credentials NEVER committed
 .env
 .env.local
