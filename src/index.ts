@@ -36,7 +36,7 @@ app.get('/', (req: Request, res: Response) => {
   res.status(200).json('🟢  Welcome to SCI WEB APP')
 })
 
-app.all('*', (req: Request, res: Response) => {
+app.all('*splat', (req: Request, res: Response) => {
   res.status(404).json({ message: '🚫 Page not found !' })
 })
 

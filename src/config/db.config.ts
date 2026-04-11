@@ -13,9 +13,9 @@ interface DbConfig {
 }
 
 const dbConfig: DbConfig = {
-  HOST: "localhost",
-  USER: "postgres",
-  PASSWORD: "21Déc1977!",
+  HOST: process.env.DATABASE_HOST || "localhost",
+  USER: process.env.DATABASE_USER || "postgres",
+  PASSWORD: process.env.DATABASE_PASSWORD || "21Déc1977!",
   DB: "sci",
   dialect: "postgres",
   pool: {
