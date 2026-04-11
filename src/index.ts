@@ -30,6 +30,7 @@ require('./routes/charge.routes')(app)
 require('./routes/quittance.routes')(app)
 require('./routes/inspection.routes')(app)
 require('./routes/associate.routes')(app)
+require('./routes/document.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {

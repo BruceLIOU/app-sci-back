@@ -24,6 +24,7 @@ db.Charge = require('./charge.model')(sequelize, Sequelize)
 db.Quittance = require('./quittance.model')(sequelize, Sequelize)
 db.Inspection = require('./inspection.model')(sequelize, Sequelize)
 db.Associate = require('./associate.model')(sequelize, Sequelize)
+db.Document = require('./document.model')(sequelize, Sequelize)
 
 // Property associations
 db.Property.hasMany(db.Tenant, { foreignKey: 'property_id', onDelete: 'CASCADE' })
