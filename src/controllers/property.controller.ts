@@ -3,6 +3,7 @@ import cloudinary from '../config/cloudinary.config'
 
 const db = require('../models')
 const Property = db.Property
+const Tenant = db.Tenant
 
 interface FormidableFile {
   name: string
@@ -81,7 +82,9 @@ exports.create = async (req: Request, res: Response) => {
 }
 
 exports.findAll = async (req: Request, res: Response) => {
-  await Property.findAll()
+  await Property.findAll({
+    include: [{ model: db.Tenant, attributes: ['id'] }],
+  })
     .then((data: any) => {
       res.status(201).json(data)
     })
@@ -95,7 +98,9 @@ exports.findAll = async (req: Request, res: Response) => {
 exports.findOne = async (req: Request, res: Response) => {
   const id = req.params.id
   try {
-    const data = await Property.findByPk(id)
+    const data = await Property.findByPk(id, {
+      include: [{ model: db.Tenant, attributes: ['id', 'civility', 'firstname', 'lastname', 'email', 'mobile'] }],
+    })
     if (data) {
       res.status(200).json(data)
     } else {
