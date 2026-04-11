@@ -53,7 +53,7 @@ exports.create = async (req: Request, res: Response) => {
     const file = req.files.file as FormidableFile
     const result = await cloudinary.uploader.upload(file.path, {
       folder: `sci/documents/${entity_type}`,
-      resource_type: 'auto',
+      resource_type: 'raw',
       use_filename: true,
       unique_filename: true,
     })
@@ -85,9 +85,7 @@ exports.delete = async (req: Request, res: Response) => {
     // Suppression sur Cloudinary (best-effort)
     const publicId = getPublicId(existing.file_url)
     if (publicId) {
-      await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' }).catch(() => {
-        cloudinary.uploader.destroy(publicId, { resource_type: 'image' }).catch(() => {})
-      })
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' }).catch(() => {})
     }
 
     await Document.destroy({ where: { id } })
