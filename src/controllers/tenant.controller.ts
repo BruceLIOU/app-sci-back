@@ -1,8 +1,29 @@
 import { Request, Response } from 'express'
+import cloudinary from '../config/cloudinary.config'
 
 const db = require('../models')
 const Tenant = db.Tenant
 const Property = db.Property
+
+interface FormidableFile {
+  name: string
+  path: string
+  size: number
+  type: string
+}
+
+const uploadToCloudinary = async (file: FormidableFile): Promise<string> => {
+  const result = await cloudinary.uploader.upload(file.path, {
+    folder: 'sci/tenants',
+    resource_type: 'image',
+  })
+  return result.secure_url
+}
+
+const getPublicId = (url: string): string => {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/i)
+  return match ? match[1] : ''
+}
 
 exports.create = async (req: Request, res: Response) => {
   if (!req.fields.lastname) {
@@ -16,9 +37,17 @@ exports.create = async (req: Request, res: Response) => {
     email: req.fields.email,
     mobile: req.fields.mobile,
     property_id: req.fields.property_id || null,
+    comments: req.fields.comments || null,
+    previous_address: req.fields.previous_address || null,
+    previous_zipcode: req.fields.previous_zipcode || null,
+    previous_city: req.fields.previous_city || null,
+    avatar: null as string | null,
   }
 
   try {
+    if (req.files?.avatar) {
+      tenant.avatar = await uploadToCloudinary(req.files.avatar as FormidableFile)
+    }
     const result = await Tenant.create(tenant)
     res.status(201).json(result)
   } catch (error: any) {
@@ -56,12 +85,24 @@ exports.findOne = async (req: Request, res: Response) => {
 
 exports.update = async (req: Request, res: Response) => {
   const id = req.params.id
-  const { civility, firstname, lastname, email, mobile, property_id } = req.fields
   try {
-    const result = await Tenant.update(
-      { civility, firstname, lastname, email, mobile, property_id: property_id || null },
-      { where: { id } }
-    )
+    const updateData: Record<string, any> = {}
+    const scalarFields = ['civility', 'firstname', 'lastname', 'email', 'mobile', 'property_id', 'comments', 'previous_address', 'previous_zipcode', 'previous_city'] as const
+    scalarFields.forEach((f) => {
+      if (req.fields?.[f] !== undefined) updateData[f] = req.fields[f] || null
+    })
+
+    if (req.files?.avatar) {
+      const existing = await Tenant.findByPk(id)
+      if (existing?.avatar) await cloudinary.uploader.destroy(getPublicId(existing.avatar))
+      updateData.avatar = await uploadToCloudinary(req.files.avatar as FormidableFile)
+    } else if (req.fields?.removeAvatar === 'true') {
+      const existing = await Tenant.findByPk(id)
+      if (existing?.avatar) await cloudinary.uploader.destroy(getPublicId(existing.avatar))
+      updateData.avatar = null
+    }
+
+    const result = await Tenant.update(updateData, { where: { id } })
     if (result[0] > 0) {
       res.status(200).json({ message: 'Locataire mis à jour avec succès.' })
     } else {

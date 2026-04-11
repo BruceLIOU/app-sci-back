@@ -22,6 +22,26 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
       property_id: {
         type: DataTypes.INTEGER,
       },
+      avatar: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      comments: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      previous_address: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      previous_zipcode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      previous_city: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     },
     {}
   )
