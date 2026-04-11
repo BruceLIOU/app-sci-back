@@ -159,9 +159,6 @@ exports.etatDesLieux = async (req: Request, res: Response) => {
     const title = `État des lieux d'${typeLabel} – ${property?.city || ''} – ${inspection.date || ''}`
 
     const docInspection = await saveDocument(buffer, { title, category: 'etat-des-lieux', entity_type: 'inspection', entity_id: inspection.id, filename })
-    if (property) {
-      await saveDocument(buffer, { title, category: 'etat-des-lieux', entity_type: 'property', entity_id: property.id, filename })
-    }
 
     res.status(201).json({ message: 'PDF généré.', document: docInspection, file_url: docInspection.file_url })
   } catch (e: any) {

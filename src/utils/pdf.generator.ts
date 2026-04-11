@@ -579,9 +579,14 @@ export async function generateEtatDesLieuxPdf(inspection: any, property: any, te
   }
 
   // Observations générales
+  section(doc, 'VI. Observations générales')
   if (inspection.general_notes) {
-    section(doc, 'VI. Observations générales')
     paragraph(doc, inspection.general_notes)
+    doc.moveDown(0.5)
+  }
+  for (let i = 0; i < 3; i++) {
+    doc.moveTo(45, doc.y).lineTo(doc.page.width - 45, doc.y).strokeColor(LINE).lineWidth(0.3).stroke()
+    doc.moveDown(0.8)
   }
 
   // Réserves
