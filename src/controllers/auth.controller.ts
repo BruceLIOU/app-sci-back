@@ -8,7 +8,10 @@ const db = require('../models')
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001'
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret'
 const JWT_EXPIRY = '7d'
-const COOKIE_NAME = 'sci_token'
+const COOKIE_NAME = 'landlord_token'
+const LEGACY_COOKIE_NAME = 'sci_token'
+const LOGIN_CODE_TTL_MINUTES = 15
+const LOGIN_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 
 function issueToken(userId: number): string {
   return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRY })
@@ -23,7 +26,20 @@ function setTokenCookie(res: Response, token: string) {
   })
 }
 
-// POST /api/auth/request-login — envoyer un magic link de connexion
+function normalizeLoginCode(value: unknown): string {
+  return String(value || '').trim().toUpperCase()
+}
+
+function generateLoginCode(length = 6): string {
+  let output = ''
+  for (let index = 0; index < length; index += 1) {
+    const randomIndex = crypto.randomInt(0, LOGIN_CODE_ALPHABET.length)
+    output += LOGIN_CODE_ALPHABET[randomIndex]
+  }
+  return output
+}
+
+// POST /api/auth/request-login — envoyer un code de connexion éphémère
 exports.requestLogin = async (req: Request, res: Response) => {
   const email = (req as any).fields?.email || req.body?.email
   if (!email || typeof email !== 'string') {
@@ -33,52 +49,54 @@ exports.requestLogin = async (req: Request, res: Response) => {
     const user = await db.User.findOne({ where: { email: email.toLowerCase().trim() } })
     // Réponse générique pour ne pas révéler l'existence du compte
     if (!user || user.status !== 'active') {
-      return res.json({ message: 'Si votre email est connu, vous recevrez un lien de connexion.' })
+      return res.json({ message: 'Si votre email est connu, vous recevrez un code de connexion.' })
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex')
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
-    const expiry = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+    const loginCode = generateLoginCode()
+    const tokenHash = crypto.createHash('sha256').update(loginCode).digest('hex')
+    const expiry = new Date(Date.now() + LOGIN_CODE_TTL_MINUTES * 60 * 1000)
 
     await user.update({ login_token_hash: tokenHash, login_token_expiry: expiry })
 
-    const backendUrl = `${req.protocol}://${req.get('host')}`
-    const loginLink = `${backendUrl}/api/auth/verify-login?token=${rawToken}`
-    await EmailService.sendLoginEmail(user.email, loginLink)
+    await EmailService.sendLoginCodeEmail(user.email, loginCode, LOGIN_CODE_TTL_MINUTES)
 
-    res.json({ message: 'Si votre email est connu, vous recevrez un lien de connexion.' })
+    res.json({ message: 'Si votre email est connu, vous recevrez un code de connexion.', expiresInMinutes: LOGIN_CODE_TTL_MINUTES })
   } catch (e: any) {
     console.error('Request login error:', e.message)
     res.status(500).json({ message: 'Erreur serveur.' })
   }
 }
 
-// GET /api/auth/verify-login?token=<token> — valider le magic link de connexion
+// POST /api/auth/verify-login — valider le code de connexion éphémère
 exports.verifyLogin = async (req: Request, res: Response) => {
-  const { token } = req.query
-  if (!token || typeof token !== 'string') {
-    return res.redirect(`${FRONTEND_URL}/#/login?error=invalid_token`)
+  const email = String((req as any).fields?.email || req.body?.email || '').trim().toLowerCase()
+  const code = normalizeLoginCode((req as any).fields?.code || req.body?.code)
+
+  if (!email || !code || code.length !== 6) {
+    return res.status(400).json({ message: 'Email et code de connexion requis.' })
   }
+
   try {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
-    const user = await db.User.findOne({ where: { login_token_hash: tokenHash } })
+    const tokenHash = crypto.createHash('sha256').update(code).digest('hex')
+    const user = await db.User.findOne({ where: { email, login_token_hash: tokenHash } })
 
     if (!user) {
-      return res.redirect(`${FRONTEND_URL}/#/login?error=invalid_token`)
+      return res.status(400).json({ message: 'Code de connexion invalide.' })
     }
     if (!user.login_token_expiry || new Date() > new Date(user.login_token_expiry)) {
-      return res.redirect(`${FRONTEND_URL}/#/login?error=expired_token`)
+      await user.update({ login_token_hash: null, login_token_expiry: null })
+      return res.status(400).json({ message: 'Ce code a expiré. Demandez-en un nouveau.' })
     }
 
-    // Invalider le token (usage unique)
+    // Invalider le code (usage unique)
     await user.update({ login_token_hash: null, login_token_expiry: null })
 
     const jwt_token = issueToken(user.id)
     setTokenCookie(res, jwt_token)
-    res.redirect(`${FRONTEND_URL}/#/dashboard`)
+    res.json({ message: 'Connexion réussie.' })
   } catch (e: any) {
     console.error('Verify login error:', e.message)
-    res.redirect(`${FRONTEND_URL}/#/login?error=auth_failed`)
+    res.status(500).json({ message: 'Échec de l’authentification.' })
   }
 }
 
@@ -120,6 +138,7 @@ exports.activateAccount = async (req: Request, res: Response) => {
 // POST /api/auth/logout
 exports.logout = (_req: Request, res: Response) => {
   res.clearCookie(COOKIE_NAME)
+  res.clearCookie(LEGACY_COOKIE_NAME)
   res.json({ message: 'Déconnecté.' })
 }
 
@@ -203,7 +222,7 @@ exports.uploadAvatar = async (req: Request, res: Response) => {
     }
 
     const result = await cloudinary.uploader.upload(file.path, {
-      folder: 'sci/avatars',
+      folder: 'landlords/avatars',
       transformation: [{ width: 200, height: 200, crop: 'fill', gravity: 'face' }],
     })
 

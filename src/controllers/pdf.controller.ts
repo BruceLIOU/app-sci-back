@@ -49,7 +49,7 @@ async function saveDocument(
   },
 ) {
   const displayName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`
-  const { secure_url, bytes } = await uploadPdfToCloudinary(buffer, `sci/pdf/${entity_type}`, filename)
+  const { secure_url, bytes } = await uploadPdfToCloudinary(buffer, `landlords/pdf/${entity_type}`, filename)
   return db.Document.create({
     title,
     category,
@@ -81,8 +81,8 @@ const quittanceInclude = [
 ]
 
 async function getLandlord() {
-  // Informations de la SCI (Paramètres)
-  return db.SciConfig.findOne()
+  // Informations bailleur (Paramètres)
+  return db.OwnerConfig.findOne()
 }
 
 function slug(str: string) {
@@ -211,7 +211,7 @@ exports.emailBail = async (req: Request, res: Response) => {
     const landlord = await getLandlord()
     const buffer = await generateBailPdf(lease, property, tenant, landlord)
     const filename = slug(`bail_${property?.city || 'bien'}_${tenant.lastname}_${lease.start_date || 'date'}`) + '.pdf'
-    const appName = process.env.APP_NAME || 'App SCI'
+    const appName = process.env.APP_NAME || 'Pilotage Immo'
     await sendPdfByEmail(
       tenant.email,
       `Votre bail de location – ${property?.address || ''}, ${property?.city || ''}`,
@@ -253,7 +253,7 @@ exports.emailQuittance = async (req: Request, res: Response) => {
     const landlord = await getLandlord()
     const buffer = await generateQuittancePdf(quittance, property, tenant, landlord)
     const filename = slug(`quittance_${quittance.period || 'periode'}_${tenant.lastname}`) + '.pdf'
-    const appName = process.env.APP_NAME || 'App SCI'
+    const appName = process.env.APP_NAME || 'Pilotage Immo'
     await sendPdfByEmail(
       tenant.email,
       `Votre quittance de loyer – ${quittance.period}`,
@@ -295,7 +295,7 @@ exports.emailEtatDesLieux = async (req: Request, res: Response) => {
     const buffer = await generateEtatDesLieuxPdf(inspection, property, tenant, landlord)
     const typeEntree = inspection.type === 'entree' ? 'entrée' : 'sortie'
     const filename = slug(`edl_${inspection.type}_${property?.city || 'bien'}_${tenant.lastname}_${inspection.date || 'date'}`) + '.pdf'
-    const appName = process.env.APP_NAME || 'App SCI'
+    const appName = process.env.APP_NAME || 'Pilotage Immo'
     await sendPdfByEmail(
       tenant.email,
       `État des lieux d'${typeEntree} – ${property?.address || ''}, ${property?.city || ''}`,
@@ -352,6 +352,11 @@ exports.declaration2072 = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Année invalide.' })
     }
 
+    const ownerConfig = await db.OwnerConfig.findOne()
+    if (ownerConfig?.owner_profile_type !== 'SCI') {
+      return res.status(403).json({ message: 'La déclaration 2072 est réservée au profil SCI.' })
+    }
+
     const [payments, charges, associates, properties, landlord] = await Promise.all([
       db.Payment.findAll({
         where: { status: 'paid' },
@@ -365,7 +370,7 @@ exports.declaration2072 = async (req: Request, res: Response) => {
       }),
       db.Associate.findAll(),
       db.Property.findAll(),
-      db.SciConfig.findOne(),
+      db.OwnerConfig.findOne(),
     ])
 
     const yearStr = String(year)

@@ -7,7 +7,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret'
   try {
     const cookies = (req as any).cookies || {}
-    const token = cookies['sci_token']
+    const token = cookies['landlord_token'] || cookies['sci_token']
     if (!token) return res.status(401).json({ message: 'Non authentifié.' })
 
     const payload = jwt.verify(token, JWT_SECRET) as { id: number }

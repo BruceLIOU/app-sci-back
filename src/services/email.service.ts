@@ -7,9 +7,9 @@ const db = require('../models')
 async function createTransporter() {
   let config: any = null
   try {
-    config = await db.SciConfig.findOne()
+    config = await db.OwnerConfig.findOne()
   } catch (_) {}
-  const appName = process.env.APP_NAME || 'App SCI'
+  const appName = process.env.APP_NAME || 'Pilotage Immo'
   const host = config?.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com'
   const port = config?.smtp_port ?? parseInt(process.env.SMTP_PORT || '587', 10)
   const secure = config?.smtp_secure ?? (process.env.SMTP_SECURE === 'true')
@@ -24,7 +24,7 @@ async function createTransporter() {
 
 export async function sendInvitationEmail(to: string, activationLink: string): Promise<void> {
   const { transport, from } = await createTransporter()
-  const appName = process.env.APP_NAME || 'App SCI'
+  const appName = process.env.APP_NAME || 'Pilotage Immo'
   await transport.sendMail({
     from,
     to,
@@ -98,29 +98,29 @@ export async function sendZipByEmail(
   })
 }
 
-export async function sendLoginEmail(to: string, loginLink: string): Promise<void> {
+export async function sendLoginCodeEmail(to: string, loginCode: string, expiresInMinutes: number): Promise<void> {
   const { transport, from } = await createTransporter()
-  const appName = process.env.APP_NAME || 'App SCI'
+  const appName = process.env.APP_NAME || 'Pilotage Immo'
   await transport.sendMail({
     from,
     to,
-    subject: `Votre lien de connexion - ${appName}`,
+    subject: `Votre code de connexion - ${appName}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2d6a4f;">Connexion à ${appName}</h2>
-        <p>Vous avez demandé un lien de connexion. Cliquez sur le bouton ci-dessous pour accéder à votre compte :</p>
-        <p style="text-align: center; margin: 32px 0;">
-          <a href="${loginLink}"
-             style="background-color: #2d6a4f; color: white; padding: 14px 28px;
-                    text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">
-            Me connecter
-          </a>
-        </p>
+        <p>Vous avez demandé un code de connexion. Saisissez ce code dans l'application pour accéder à votre compte :</p>
+        <div style="text-align: center; margin: 32px 0;">
+          <div style="display: inline-block; background: #f3f7f4; border: 1px solid #d8e5db; border-radius: 12px; padding: 18px 24px;">
+            <div style="font-size: 28px; letter-spacing: 0.35em; font-weight: bold; color: #1f5138; font-family: 'Courier New', monospace; margin-left: 0.35em;">
+              ${loginCode}
+            </div>
+          </div>
+        </div>
         <p style="color: #666; font-size: 14px;">
-          Ce lien est valable <strong>15 minutes</strong> et ne peut être utilisé qu'une seule fois.
+          Ce code est valable <strong>${expiresInMinutes} minutes</strong> et ne peut être utilisé qu'une seule fois.
         </p>
         <p style="color: #999; font-size: 12px;">
-          Si vous n'avez pas demandé ce lien, ignorez cet email.
+          Si vous n'avez pas demandé ce code, ignorez cet email.
         </p>
       </div>
     `,

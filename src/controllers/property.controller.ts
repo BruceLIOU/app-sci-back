@@ -13,7 +13,7 @@ interface FormidableFile {
 
 const uploadToCloudinary = async (file: FormidableFile): Promise<string> => {
   const result = await cloudinary.uploader.upload(file.path, {
-    folder: 'sci/properties',
+    folder: 'landlords/properties',
     resource_type: 'image',
   })
   return result.secure_url

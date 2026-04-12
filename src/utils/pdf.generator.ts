@@ -66,7 +66,7 @@ function drawFooter(doc: InstanceType<typeof PDFDocument>, note?: string) {
     })
 }
 
-// ─── Interface Bailleur (SciConfig) ──────────────────────────────────────────
+// ─── Interface Bailleur ──────────────────────────────────────────────────────
 export interface LandlordInfo {
   name?: string
   legal_form?: string
@@ -83,7 +83,7 @@ export interface LandlordInfo {
   manager_phone?: string
 }
 
-function landlordSciName(l: LandlordInfo): string {
+function landlordDisplayName(l: LandlordInfo): string {
   return [l.legal_form || 'SCI', l.name].filter(v => v && v.trim()).join(' ').trim() || '—'
 }
 
@@ -147,7 +147,7 @@ export async function generateBailPdf(lease: any, property: any, tenant: any, la
     commercial: 'Articles L. 145-1 et suivants du Code de commerce',
   }
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Contrat de bail', Author: 'SCI App' } })
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Contrat de bail', Author: 'Pilotage Immo' } })
   drawHeader(doc, 'CONTRAT DE BAIL', typeLabel[lease.type] || lease.type)
 
   doc.y = 100
@@ -158,7 +158,7 @@ export async function generateBailPdf(lease: any, property: any, tenant: any, la
   // Bailleur
   section(doc, 'I. Bailleur')
   if (landlord?.name) {
-    row(doc, 'Raison sociale', landlordSciName(landlord))
+    row(doc, 'Raison sociale', landlordDisplayName(landlord))
     const addr = [landlord.address, landlord.zipcode, landlord.city].filter(Boolean).join(', ')
     if (addr) row(doc, 'Siège social', addr)
     if (landlord.siret) row(doc, 'SIRET', landlord.siret)
@@ -280,7 +280,7 @@ export async function generateBailPdf(lease: any, property: any, tenant: any, la
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function generateQuittancePdf(quittance: any, property: any, tenant: any, landlord?: LandlordInfo): Promise<Buffer> {
-  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Quittance de loyer', Author: 'SCI App' } })
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Quittance de loyer', Author: 'Pilotage Immo' } })
   const pageW = doc.page.width
 
   drawHeader(doc, 'QUITTANCE DE LOYER', 'Art. 21 – Loi n°89-462 du 6 juillet 1989')
@@ -307,9 +307,9 @@ export async function generateQuittancePdf(quittance: any, property: any, tenant
   doc.fontSize(9)
   let bY = boxY + 22
   if (landlord?.name) {
-    const sciName = landlordSciName(landlord)
+    const landlordName = landlordDisplayName(landlord)
     doc.fillColor('#000000').font('Helvetica-Bold')
-      .text(sciName, 46, bY, { width: colW - 10, lineBreak: false }); bY += 14
+      .text(landlordName, 46, bY, { width: colW - 10, lineBreak: false }); bY += 14
     const mgr = landlordManagerName(landlord)
     if (mgr) {
       doc.fillColor(GRAY).font('Helvetica')
@@ -414,7 +414,7 @@ export async function generateQuittancePdf(quittance: any, property: any, tenant
   section(doc, 'Déclaration du bailleur')
 
   const bailleurName = landlord?.name
-    ? landlordSciName(landlord)
+    ? landlordDisplayName(landlord)
     : '(le bailleur)'
 
   paragraph(doc,
@@ -452,7 +452,7 @@ export async function generateEtatDesLieuxPdf(inspection: any, property: any, te
     'À rénover': '130,0,0',
   }
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: `État des lieux d'${typeLabel[inspection.type]?.toLowerCase() || 'entrée'}`, Author: 'SCI App' } })
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: `État des lieux d'${typeLabel[inspection.type]?.toLowerCase() || 'entrée'}`, Author: 'Pilotage Immo' } })
   drawHeader(doc, `ÉTAT DES LIEUX D'${typeLabel[inspection.type] || 'ENTRÉE'}`, 'Décret n°2016-382 du 30 mars 2016 (loi ALUR)')
 
   doc.y = 100
@@ -469,7 +469,7 @@ export async function generateEtatDesLieuxPdf(inspection: any, property: any, te
   if (property.pieces) row(doc, 'Nombre de pièces', String(property.pieces))
 
   section(doc, 'III. Parties présentes')
-  row(doc, 'Bailleur / Mandataire', landlord?.name ? landlordSciName(landlord) : '(à compléter)')
+  row(doc, 'Bailleur / Mandataire', landlord?.name ? landlordDisplayName(landlord) : '(à compléter)')
   row(doc, 'Locataire', tenantFullName(tenant))
 
   section(doc, 'IV. Clés et équipements remis')
@@ -623,14 +623,14 @@ export async function generateEtatDesLieuxPdf(inspection: any, property: any, te
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function generateAttestationLoyerPdf(lease: any, property: any, tenant: any, landlord?: LandlordInfo): Promise<Buffer> {
-  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Attestation de loyer', Author: 'SCI App' } })
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: 'Attestation de loyer', Author: 'Pilotage Immo' } })
   drawHeader(doc, 'ATTESTATION DE LOYER', 'Document établi à la demande du locataire')
 
   doc.y = 100
 
   section(doc, 'Bailleur')
   if (landlord?.name) {
-    row(doc, 'Raison sociale', landlordSciName(landlord))
+    row(doc, 'Raison sociale', landlordDisplayName(landlord))
     const addr = [landlord.address, landlord.zipcode, landlord.city].filter(Boolean).join(', ')
     if (addr) row(doc, 'Adresse', addr)
     const mgr = landlordManagerName(landlord)
@@ -658,7 +658,7 @@ export async function generateAttestationLoyerPdf(lease: any, property: any, ten
   row(doc, 'Dépôt de garantie versé', fmt(lease.deposit_amount))
 
   section(doc, 'Attestation')
-  const landlordNameAttest = landlord?.name ? landlordSciName(landlord) : '(le bailleur)'
+  const landlordNameAttest = landlord?.name ? landlordDisplayName(landlord) : '(le bailleur)'
   paragraph(doc,
     `Je soussigné(e), ${landlordNameAttest}, bailleur du logement situé ${propertyFullAddress(property)}, ` +
     `atteste que ${tenantFullName(tenant)} est locataire de ce logement depuis le ${fmtDate(lease.start_date)} ` +
@@ -720,7 +720,7 @@ export interface Declaration2072Data {
 export async function generateDeclaration2072Pdf(data: Declaration2072Data): Promise<Buffer> {
   const { year, landlord, byProperty, byAssociate, totalRevenues, totalCharges, netResult } = data
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: `Déclaration 2072-S – ${year}`, Author: 'SCI App' } })
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: `Déclaration 2072-S – ${year}`, Author: 'Pilotage Immo' } })
   const pageW = doc.page.width
 
   // ── En-tête ────────────────────────────────────────────────────────────────
@@ -743,7 +743,7 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
   section(doc, 'CADRE I — Identification de la société')
 
   if (landlord?.name) {
-    row(doc, 'Dénomination sociale', landlordSciName(landlord))
+    row(doc, 'Dénomination sociale', landlordDisplayName(landlord))
     row(doc, 'Forme juridique', landlord.legal_form || 'SCI')
     if (landlord.siret) row(doc, 'N° SIRET', landlord.siret)
     if (landlord.rcs) row(doc, 'Immatriculation RCS', landlord.rcs)
@@ -1025,13 +1025,13 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
   if (doc.y > doc.page.height - 140) { doc.addPage(); doc.y = 50 }
   section(doc, 'CADRE VII — Déclaration et engagement du gérant')
 
-  const sciName = landlord?.name ? landlordSciName(landlord) : '(la société)'
+  const landlordName = landlord?.name ? landlordDisplayName(landlord) : '(la société)'
   const gerant = landlord?.manager_firstname
     ? landlordManagerName(landlord)
     : '(le gérant)'
 
   paragraph(doc,
-    `Je soussigné(e), ${gerant}, gérant(e) de la société ${sciName}, certifie l'exactitude des renseignements portés sur la présente déclaration ` +
+    `Je soussigné(e), ${gerant}, gérant(e) de la société ${landlordName}, certifie l'exactitude des renseignements portés sur la présente déclaration ` +
     `et m'engage à tenir à la disposition de l'Administration fiscale tout document justificatif permettant de vérifier les éléments déclarés, ` +
     `conformément aux dispositions des articles 46 C et 46 D de l'annexe III au CGI.`,
   )

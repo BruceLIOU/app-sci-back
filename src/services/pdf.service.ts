@@ -42,14 +42,14 @@ export async function generateAndSaveQuittancePdf(quittanceId: number): Promise<
 
   const property = quittance.Property
   const tenant = quittance.Tenant
-  const landlord = await db.SciConfig.findOne()
+  const landlord = await db.OwnerConfig.findOne()
 
   const buffer = await generateQuittancePdf(quittance, property, tenant, landlord)
   const filename = slug(`quittance_${quittance.period || 'periode'}_${tenant?.lastname || 'locataire'}`)
   const title = `Quittance – ${quittance.period || ''} – ${tenant ? `${tenant.lastname} ${tenant.firstname}` : ''}`
   const displayName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`
 
-  const { secure_url, bytes } = await uploadPdfToCloudinary(buffer, 'sci/pdf/quittance', filename)
+  const { secure_url, bytes } = await uploadPdfToCloudinary(buffer, 'landlords/pdf/quittance', filename)
 
   await db.Document.create({
     title,

@@ -21,12 +21,12 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
   const result: SyncResult = { processed: 0, created: 0, skipped: 0, errors: [] }
 
   // Lire matera_property_id depuis la DB (fallback sur l'env)
-  let sciConfig: any = null
+  let ownerConfig: any = null
   try {
-    sciConfig = await db.SciConfig.findOne()
+    ownerConfig = await db.OwnerConfig.findOne()
   } catch (_) {}
 
-  const rawPropertyId = sciConfig?.matera_property_id ?? process.env.MATERA_PROPERTY_ID
+  const rawPropertyId = ownerConfig?.matera_property_id ?? process.env.MATERA_PROPERTY_ID
   let propertyId: number | null = null
   if (rawPropertyId) {
     const parsed = parseInt(String(rawPropertyId), 10)

@@ -28,7 +28,7 @@ db.sequelize
     let schedule = process.env.CHARGE_CRON_SCHEDULE || '0 8 * * *'
     let enabled = true
     try {
-      const config = await db.SciConfig.findOne()
+      const config = await db.OwnerConfig.findOne()
       if (config?.charge_cron_schedule) schedule = config.charge_cron_schedule
       if (config && config.charge_cron_enabled === false) enabled = false
     } catch (_) {}
@@ -54,14 +54,14 @@ require('./routes/inspection.routes')(app)
 require('./routes/associate.routes')(app)
 require('./routes/document.routes')(app)
 require('./routes/pdf.routes')(app)
-require('./routes/sci_config.routes')(app)
+require('./routes/owner_config.routes')(app)
 require('./routes/visit.routes')(app)
 require('./routes/user.routes')(app)
 require('./routes/notification.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {
-  res.status(200).json('🟢  Welcome to SCI WEB APP')
+  res.status(200).json('🟢  Welcome to Pilotage Immo API')
 })
 
 app.all('*splat', (req: Request, res: Response) => {

@@ -5,7 +5,7 @@ module.exports = (app: any) => {
 
   // Routes publiques (sans auth)
   app.post('/api/auth/request-login', auth.requestLogin)
-  app.get('/api/auth/verify-login', auth.verifyLogin)
+  app.post('/api/auth/verify-login', auth.verifyLogin)
   app.get('/api/auth/activate', auth.activateAccount)
   app.post('/api/auth/logout', auth.logout)
 

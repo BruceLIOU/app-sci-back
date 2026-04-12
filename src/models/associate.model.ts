@@ -9,7 +9,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     phone: { type: DataTypes.STRING, allowNull: true },
     address: { type: DataTypes.TEXT, allowNull: true },
     shares: { type: DataTypes.DECIMAL(5, 2), defaultValue: 0, comment: 'Percentage of shares' },
-    role: { type: DataTypes.STRING, defaultValue: 'Associé' },
+    role: { type: DataTypes.STRING, defaultValue: 'Co-bailleur' },
   }, {})
 
   return Associate

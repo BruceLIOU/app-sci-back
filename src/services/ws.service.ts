@@ -21,7 +21,7 @@ export function initWss(server: Server): void {
 
   wss.on('connection', (ws: WebSocket, req) => {
     const cookies = parseCookies(req.headers.cookie || '')
-    const token = cookies['sci_token']
+    const token = cookies['landlord_token'] || cookies['sci_token']
     if (!token) {
       ws.close(1008, 'Unauthorized')
       return

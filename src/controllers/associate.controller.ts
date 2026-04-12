@@ -6,7 +6,7 @@ exports.create = async (req: Request, res: Response) => {
   const { civility, firstname, lastname, email, phone, address, shares, role } = req.fields
   if (!lastname || !shares) return res.status(400).json({ message: 'Nom et parts obligatoires.' })
   try {
-    const result = await Associate.create({ civility: civility || 'MR', firstname: firstname || '', lastname, email: email || '', phone: phone || '', address: address || '', shares, role: role || 'Associé' })
+    const result = await Associate.create({ civility: civility || 'MR', firstname: firstname || '', lastname, email: email || '', phone: phone || '', address: address || '', shares, role: role || 'Co-bailleur' })
     res.status(201).json(result)
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }

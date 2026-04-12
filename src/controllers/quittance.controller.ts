@@ -107,8 +107,8 @@ exports.bulkEmail = async (req: Request, res: Response) => {
       { model: Property, attributes: ['id', 'type', 'address', 'zipcode', 'city'] },
       { model: Tenant, attributes: ['id', 'civility', 'firstname', 'lastname', 'email'] },
     ]
-    const landlord = await db.SciConfig.findOne()
-    const appName = process.env.APP_NAME || 'App SCI'
+    const landlord = await db.OwnerConfig.findOne()
+    const appName = process.env.APP_NAME || 'Pilotage Immo'
 
     const quittances = await Quittance.findAll({ where: { id: ids }, include: quittanceInclude })
 

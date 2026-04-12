@@ -10,7 +10,7 @@ const include = [
 ]
 
 async function syncCreate(visit: any) {
-  const config = await db.SciConfig.findOne()
+  const config = await db.OwnerConfig.findOne()
   if (!config?.google_refresh_token) return
   try {
     const eventId = await GoogleCalendarService.createGoogleEvent(config.google_refresh_token, {
@@ -30,7 +30,7 @@ async function syncCreate(visit: any) {
 }
 
 async function syncUpdate(visit: any) {
-  const config = await db.SciConfig.findOne()
+  const config = await db.OwnerConfig.findOne()
   if (!config?.google_refresh_token) return
   try {
     if (visit.google_event_id) {
@@ -53,7 +53,7 @@ async function syncUpdate(visit: any) {
 }
 
 async function syncDelete(visit: any) {
-  const config = await db.SciConfig.findOne()
+  const config = await db.OwnerConfig.findOne()
   if (!config?.google_refresh_token || !visit.google_event_id) return
   try {
     await GoogleCalendarService.deleteGoogleEvent(config.google_refresh_token, visit.google_event_id, config.google_calendar_id)
@@ -142,7 +142,7 @@ exports.delete = async (req: Request, res: Response) => {
 
 exports.googleStatus = async (_req: Request, res: Response) => {
   try {
-    const config = await db.SciConfig.findOne()
+    const config = await db.OwnerConfig.findOne()
     res.json({ connected: !!(config?.google_refresh_token) })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }
@@ -162,8 +162,8 @@ exports.googleCallback = async (req: Request, res: Response) => {
   }
   try {
     const { refresh_token } = await GoogleCalendarService.exchangeCodeForTokens(code)
-    let config = await db.SciConfig.findOne()
-    if (!config) config = await db.SciConfig.create({})
+    let config = await db.OwnerConfig.findOne()
+    if (!config) config = await db.OwnerConfig.create({})
     await config.update({ google_refresh_token: refresh_token })
     res.redirect(`${frontendUrl}/#/admin/settings?google=success`)
   } catch (e: any) {
@@ -174,7 +174,7 @@ exports.googleCallback = async (req: Request, res: Response) => {
 
 exports.googleDisconnect = async (_req: Request, res: Response) => {
   try {
-    const config = await db.SciConfig.findOne()
+    const config = await db.OwnerConfig.findOne()
     if (config) await config.update({ google_refresh_token: null })
     res.json({ message: 'Google Calendar déconnecté.' })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
@@ -182,7 +182,7 @@ exports.googleDisconnect = async (_req: Request, res: Response) => {
 
 exports.googleCalendars = async (_req: Request, res: Response) => {
   try {
-    const config = await db.SciConfig.findOne()
+    const config = await db.OwnerConfig.findOne()
     if (!config?.google_refresh_token) {
       return res.status(400).json({ message: 'Google Calendar non connecté.' })
     }

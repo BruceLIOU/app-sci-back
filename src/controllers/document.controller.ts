@@ -52,7 +52,7 @@ exports.create = async (req: Request, res: Response) => {
   try {
     const file = req.files.file as FormidableFile
     const result = await cloudinary.uploader.upload(file.path, {
-      folder: `sci/documents/${entity_type}`,
+      folder: `landlords/documents/${entity_type}`,
       resource_type: 'raw',
       use_filename: true,
       unique_filename: true,

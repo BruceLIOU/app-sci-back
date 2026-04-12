@@ -1,10 +1,12 @@
 import { Sequelize } from 'sequelize'
 
 module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof import('sequelize').DataTypes }) => {
-  const SciConfig = sequelize.define('SciConfig', {
-    // Informations SCI
+  const OwnerConfig = sequelize.define('OwnerConfig', {
+    // Profil bailleur
+    owner_profile_type: { type: DataTypes.STRING, defaultValue: 'INDIVIDUAL' },
+    // Informations structure bailleur (SCI ou personne physique)
     name: { type: DataTypes.STRING, defaultValue: '' },
-    legal_form: { type: DataTypes.STRING, defaultValue: 'SCI' },
+    legal_form: { type: DataTypes.STRING, defaultValue: 'Particulier' },
     siret: { type: DataTypes.STRING, allowNull: true },
     rcs: { type: DataTypes.STRING, allowNull: true },
     address: { type: DataTypes.STRING, defaultValue: '' },
@@ -39,7 +41,9 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     // Cron
     charge_cron_schedule: { type: DataTypes.STRING, defaultValue: '0 8 * * *' },
     charge_cron_enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
-  }, {})
+  }, {
+    tableName: 'OwnerConfigs',
+  })
 
-  return SciConfig
+  return OwnerConfig
 }

@@ -1,12 +1,13 @@
 {
-  "name": "app-sci-back",
+  "name": "app-bailleurs-back",
   "version": "2.0.0",
-  "description": "Backend SCI — Express 5 + TypeScript",
+  "description": "Backend bailleurs — Express 5 + TypeScript",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node -r tsconfig-paths/register src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "migrate:owner-config-table": "node scripts/run-sql-migration.js migrations/sql/20260412_rename_sciconfig_to_ownerconfig.sql"
   },
   "author": "Bruce LIOU",
   "license": "MIT",

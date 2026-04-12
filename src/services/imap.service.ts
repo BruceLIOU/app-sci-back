@@ -12,21 +12,21 @@ export interface RawMateraEmail {
 }
 
 export async function fetchMateraEmails(): Promise<RawMateraEmail[]> {
-  let sciConfig: any = null
+  let ownerConfig: any = null
   try {
-    sciConfig = await db.SciConfig.findOne()
+    ownerConfig = await db.OwnerConfig.findOne()
   } catch (_) {}
 
-  const senderEmail = sciConfig?.matera_sender_email || process.env.MATERA_SENDER_EMAIL
+  const senderEmail = ownerConfig?.matera_sender_email || process.env.MATERA_SENDER_EMAIL
   if (!senderEmail) throw new Error('MATERA_SENDER_EMAIL non configuré')
 
   const imapConfig = {
     imap: {
-      host: sciConfig?.imap_host || process.env.IMAP_HOST || '',
-      port: sciConfig?.imap_port ?? parseInt(process.env.IMAP_PORT || '993', 10),
-      tls: sciConfig?.imap_tls ?? (process.env.IMAP_TLS !== 'false'),
-      user: sciConfig?.imap_user || process.env.IMAP_USER || '',
-      password: (sciConfig?.imap_pass ? decrypt(sciConfig.imap_pass) : null) || process.env.IMAP_PASS || '',
+      host: ownerConfig?.imap_host || process.env.IMAP_HOST || '',
+      port: ownerConfig?.imap_port ?? parseInt(process.env.IMAP_PORT || '993', 10),
+      tls: ownerConfig?.imap_tls ?? (process.env.IMAP_TLS !== 'false'),
+      user: ownerConfig?.imap_user || process.env.IMAP_USER || '',
+      password: (ownerConfig?.imap_pass ? decrypt(ownerConfig.imap_pass) : null) || process.env.IMAP_PASS || '',
       authTimeout: 10000,
       tlsOptions: { rejectUnauthorized: false },
     },
