@@ -1,4 +1,5 @@
 const db = require('../models')
+import { broadcastNotification } from './ws.service'
 
 export interface NotificationData {
   type: 'matera_charge' | 'email_sent'
@@ -8,17 +9,18 @@ export interface NotificationData {
 }
 
 /**
- * Crée une notification en base (échoue silencieusement pour ne pas bloquer le flux principal).
+ * Crée une notification en base et la diffuse en temps réel via WebSocket.
  */
 export async function createNotification(data: NotificationData): Promise<void> {
   try {
-    await db.Notification.create({
+    const notif = await db.Notification.create({
       type: data.type,
       title: data.title,
       message: data.message ?? null,
       is_read: false,
       metadata: data.metadata ?? null,
     })
+    broadcastNotification(notif.toJSON())
   } catch (err: any) {
     console.error('[NOTIFICATION] Erreur création notification :', err.message)
   }

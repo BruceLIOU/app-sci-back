@@ -31,7 +31,8 @@
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.8"
+    "sequelize": "^6.37.8",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -42,6 +43,7 @@
     "@types/mailparser": "^3.4.6",
     "@types/node": "^22.19.17",
     "@types/node-cron": "^3.0.11",
+    "@types/ws": "^8.18.1",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",

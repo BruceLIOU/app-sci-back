@@ -1,9 +1,11 @@
 import express, { Application, Request, Response } from 'express'
+import http from 'http'
 import formidable from 'express-formidable'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import { requireAuth } from './middleware/auth.middleware'
 import { startCron } from './services/cron-manager.service'
+import { initWss } from './services/ws.service'
 
 require('dotenv').config()
 
@@ -66,6 +68,8 @@ app.all('*splat', (req: Request, res: Response) => {
   res.status(404).json({ message: '🚫 Page not found !' })
 })
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`🟢 Server started on port ${process.env.PORT}`)
+const server = http.createServer(app)
+initWss(server)
+server.listen(process.env.PORT || 3000, () => {
+  console.log(`🟢 Server started on port ${process.env.PORT || 3000}`)
 })
