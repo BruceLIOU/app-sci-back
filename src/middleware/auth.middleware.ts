@@ -20,3 +20,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     res.status(401).json({ message: 'Token invalide ou expiré.' })
   }
 }
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ message: 'Accès refusé. Droits administrateur requis.' })
+  }
+  next()
+}

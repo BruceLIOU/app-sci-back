@@ -44,6 +44,7 @@ require('./routes/document.routes')(app)
 require('./routes/pdf.routes')(app)
 require('./routes/sci_config.routes')(app)
 require('./routes/visit.routes')(app)
+require('./routes/user.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {

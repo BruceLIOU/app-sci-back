@@ -6,6 +6,7 @@ module.exports = (app: any) => {
   // Routes publiques (sans auth)
   app.get('/api/auth/google/url', auth.getGoogleUrl)
   app.get('/api/auth/google/callback', auth.googleCallback)
+  app.get('/api/auth/activate', auth.activateAccount)
   app.post('/api/auth/logout', auth.logout)
 
   // Routes protégées
