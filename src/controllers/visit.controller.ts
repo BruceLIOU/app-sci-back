@@ -193,3 +193,16 @@ exports.googleCalendars = async (_req: Request, res: Response) => {
     res.status(500).json({ message: e.message })
   }
 }
+
+exports.googleTest = async (_req: Request, res: Response) => {
+  try {
+    const config = await db.OwnerConfig.findOne()
+    if (!config?.google_refresh_token) {
+      return res.status(400).json({ connected: false, message: 'Google Calendar non connecte.' })
+    }
+    await GoogleCalendarService.listCalendars(config.google_refresh_token)
+    return res.json({ connected: true, message: 'Connexion Google Calendar validee.' })
+  } catch (e: any) {
+    return res.status(500).json({ connected: false, message: e.message || 'Echec du test Google Calendar.' })
+  }
+}

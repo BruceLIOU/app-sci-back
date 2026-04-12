@@ -22,6 +22,17 @@ async function createTransporter() {
   }
 }
 
+export async function testSmtpConnection(to: string): Promise<void> {
+  const { transport, from } = await createTransporter()
+  await transport.verify()
+  await transport.sendMail({
+    from,
+    to,
+    subject: 'Test SMTP - Pilotage Immo',
+    html: '<p>Connexion SMTP validee avec succes.</p>',
+  })
+}
+
 export async function sendInvitationEmail(to: string, activationLink: string): Promise<void> {
   const { transport, from } = await createTransporter()
   const appName = process.env.APP_NAME || 'Pilotage Immo'
