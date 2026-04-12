@@ -351,16 +351,8 @@ exports.declaration2072 = async (req: Request, res: Response) => {
 
     const totalRevenues: number = yearPayments.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0)
 
-    const annualCharge = (c: any): number => {
-      const a = parseFloat(c.amount || 0)
-      const d: string = c.date || ''
-      if (d.startsWith(yearStr)) return a
-      if (c.frequency === 'mensuel') return a * 12
-      if (c.frequency === 'trimestriel') return a * 4
-      if (c.frequency === 'annuel') return a
-      return 0
-    }
-    const totalCharges: number = charges.reduce((s: number, c: any) => s + annualCharge(c), 0)
+    const yearCharges = charges.filter((c: any) => (c.date || '').startsWith(yearStr))
+    const totalCharges: number = yearCharges.reduce((s: number, c: any) => s + parseFloat(c.amount || 0), 0)
     const netResult: number = totalRevenues - totalCharges
 
     const byProperty = properties.map((p: any) => {
@@ -368,8 +360,8 @@ exports.declaration2072 = async (req: Request, res: Response) => {
       const rev: number = yearPayments
         .filter((pay: any) => Number(pay.property_id) === pid)
         .reduce((s: number, pay: any) => s + parseFloat(pay.amount || 0), 0)
-      const propCharges = charges.filter((c: any) => Number(c.property_id) === pid)
-      const chg: number = propCharges.reduce((s: number, c: any) => s + annualCharge(c), 0)
+      const propCharges = yearCharges.filter((c: any) => Number(c.property_id) === pid)
+      const chg: number = propCharges.reduce((s: number, c: any) => s + parseFloat(c.amount || 0), 0)
       return {
         id: p.id,
         type: p.type || '',
@@ -392,7 +384,7 @@ exports.declaration2072 = async (req: Request, res: Response) => {
           type: c.type || '',
           description: c.description || '',
           frequency: c.frequency || '',
-          annualAmount: annualCharge(c),
+          annualAmount: parseFloat(c.amount || 0),
         })),
       }
     })
