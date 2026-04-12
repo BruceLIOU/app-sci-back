@@ -6,6 +6,7 @@ module.exports = (app: any) => {
   app.get('/api/visits/google/url', visit.googleAuthUrl)
   app.get('/api/visits/google/callback', visit.googleCallback)
   app.delete('/api/visits/google/disconnect', visit.googleDisconnect)
+  app.get('/api/visits/google/calendars', visit.googleCalendars)
 
   // CRUD
   app.get('/api/visits', visit.findAll)

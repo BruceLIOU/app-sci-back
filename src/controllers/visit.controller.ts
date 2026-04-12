@@ -22,7 +22,7 @@ async function syncCreate(visit: any) {
       contact_name: visit.contact_name,
       contact_email: visit.contact_email,
       notes: visit.notes,
-    })
+    }, config.google_calendar_id)
     await visit.update({ google_event_id: eventId })
   } catch (e: any) {
     console.error('Google Calendar sync (create) error:', e.message)
@@ -43,7 +43,7 @@ async function syncUpdate(visit: any) {
         contact_name: visit.contact_name,
         contact_email: visit.contact_email,
         notes: visit.notes,
-      })
+      }, config.google_calendar_id)
     } else {
       await syncCreate(visit)
     }
@@ -56,7 +56,7 @@ async function syncDelete(visit: any) {
   const config = await db.SciConfig.findOne()
   if (!config?.google_refresh_token || !visit.google_event_id) return
   try {
-    await GoogleCalendarService.deleteGoogleEvent(config.google_refresh_token, visit.google_event_id)
+    await GoogleCalendarService.deleteGoogleEvent(config.google_refresh_token, visit.google_event_id, config.google_calendar_id)
   } catch (e: any) {
     console.error('Google Calendar sync (delete) error:', e.message)
   }
@@ -158,17 +158,17 @@ exports.googleCallback = async (req: Request, res: Response) => {
   const { code } = req.query
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001'
   if (!code || typeof code !== 'string') {
-    return res.redirect(`${frontendUrl}/admin/visits?google=error`)
+    return res.redirect(`${frontendUrl}/#/admin/settings?google=error`)
   }
   try {
     const { refresh_token } = await GoogleCalendarService.exchangeCodeForTokens(code)
     let config = await db.SciConfig.findOne()
     if (!config) config = await db.SciConfig.create({})
     await config.update({ google_refresh_token: refresh_token })
-    res.redirect(`${frontendUrl}/admin/visits?google=success`)
+    res.redirect(`${frontendUrl}/#/admin/settings?google=success`)
   } catch (e: any) {
     console.error('Google OAuth callback error:', e.message)
-    res.redirect(`${frontendUrl}/admin/visits?google=error`)
+    res.redirect(`${frontendUrl}/#/admin/settings?google=error`)
   }
 }
 
@@ -178,4 +178,18 @@ exports.googleDisconnect = async (_req: Request, res: Response) => {
     if (config) await config.update({ google_refresh_token: null })
     res.json({ message: 'Google Calendar déconnecté.' })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
+exports.googleCalendars = async (_req: Request, res: Response) => {
+  try {
+    const config = await db.SciConfig.findOne()
+    if (!config?.google_refresh_token) {
+      return res.status(400).json({ message: 'Google Calendar non connecté.' })
+    }
+    const calendars = await GoogleCalendarService.listCalendars(config.google_refresh_token)
+    res.json(calendars)
+  } catch (e: any) {
+    console.error('googleCalendars error:', e.message, e?.response?.data)
+    res.status(500).json({ message: e.message })
+  }
 }

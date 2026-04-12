@@ -12,6 +12,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     city: { type: DataTypes.STRING, defaultValue: '' },
     iban: { type: DataTypes.STRING, allowNull: true },
     // Gérant
+    manager_associate_id: { type: DataTypes.INTEGER, allowNull: true },
     manager_civility: { type: DataTypes.STRING, defaultValue: 'M.' },
     manager_firstname: { type: DataTypes.STRING, defaultValue: '' },
     manager_lastname: { type: DataTypes.STRING, defaultValue: '' },
@@ -19,6 +20,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     manager_phone: { type: DataTypes.STRING, allowNull: true },
     // Google Calendar
     google_refresh_token: { type: DataTypes.TEXT, allowNull: true },
+    google_calendar_id: { type: DataTypes.STRING, allowNull: true },
   }, {})
 
   return SciConfig

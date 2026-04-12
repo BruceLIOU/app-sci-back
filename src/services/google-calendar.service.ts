@@ -1,7 +1,10 @@
 import { google, calendar_v3 } from 'googleapis'
 import { OAuth2Client } from 'google-auth-library'
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+]
 
 function createOAuth2Client(): OAuth2Client {
   return new google.auth.OAuth2(
@@ -69,11 +72,12 @@ function visitToGoogleEvent(visit: {
 export async function createGoogleEvent(
   refreshToken: string,
   visit: Parameters<typeof visitToGoogleEvent>[0],
+  calendarId?: string | null,
 ): Promise<string> {
   const calendar = buildCalendarClient(refreshToken)
   const event = visitToGoogleEvent(visit)
   const response = await calendar.events.insert({
-    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    calendarId: calendarId || process.env.GOOGLE_CALENDAR_ID || 'primary',
     requestBody: event,
   })
   return response.data.id!
@@ -83,20 +87,37 @@ export async function updateGoogleEvent(
   refreshToken: string,
   eventId: string,
   visit: Parameters<typeof visitToGoogleEvent>[0],
+  calendarId?: string | null,
 ): Promise<void> {
   const calendar = buildCalendarClient(refreshToken)
   const event = visitToGoogleEvent(visit)
   await calendar.events.update({
-    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    calendarId: calendarId || process.env.GOOGLE_CALENDAR_ID || 'primary',
     eventId,
     requestBody: event,
   })
 }
 
-export async function deleteGoogleEvent(refreshToken: string, eventId: string): Promise<void> {
+export async function deleteGoogleEvent(
+  refreshToken: string,
+  eventId: string,
+  calendarId?: string | null,
+): Promise<void> {
   const calendar = buildCalendarClient(refreshToken)
   await calendar.events.delete({
-    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    calendarId: calendarId || process.env.GOOGLE_CALENDAR_ID || 'primary',
     eventId,
   })
+}
+
+export async function listCalendars(
+  refreshToken: string,
+): Promise<{ id: string; summary: string; primary: boolean }[]> {
+  const calendar = buildCalendarClient(refreshToken)
+  const response = await calendar.calendarList.list()
+  return (response.data.items || []).map((c) => ({
+    id: c.id!,
+    summary: c.summary || c.id!,
+    primary: !!c.primary,
+  }))
 }
