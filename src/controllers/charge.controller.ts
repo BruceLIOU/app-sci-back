@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { runMateraChargeSync, debugMateraEmails } from '../services/charge-automation.service'
 const db = require('../models')
 const { Charge, Property } = db
 
@@ -43,4 +44,23 @@ exports.delete = async (req: Request, res: Response) => {
     if (num === 1) return res.status(200).json({ message: 'Charge supprimée.', isDeleted: true })
     res.status(404).json({ message: 'Charge introuvable.', isDeleted: false })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
+exports.syncMatera = async (_req: Request, res: Response) => {
+  try {
+    const result = await runMateraChargeSync()
+    res.status(200).json(result)
+  } catch (e: any) {
+    res.status(500).json({ message: e.message })
+  }
+}
+
+exports.debugMatera = async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt((req.query.limit as string) || '5', 10)
+    const emails = await debugMateraEmails(limit)
+    res.status(200).json(emails)
+  } catch (e: any) {
+    res.status(500).json({ message: e.message })
+  }
 }

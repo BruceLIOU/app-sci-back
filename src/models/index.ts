@@ -28,6 +28,7 @@ db.Document = require('./document.model')(sequelize, Sequelize)
 db.SciConfig = require('./sci_config.model')(sequelize, Sequelize)
 db.Visit = require('./visit.model')(sequelize, Sequelize)
 db.User = require('./user.model')(sequelize, Sequelize)
+db.ProcessedEmail = require('./processed-email.model')(sequelize, Sequelize)
 
 // Property associations
 db.Property.hasMany(db.Tenant, { foreignKey: 'property_id', onDelete: 'CASCADE' })
