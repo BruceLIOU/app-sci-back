@@ -364,10 +364,11 @@ exports.declaration2072 = async (req: Request, res: Response) => {
     const netResult: number = totalRevenues - totalCharges
 
     const byProperty = properties.map((p: any) => {
+      const pid = Number(p.id)
       const rev: number = yearPayments
-        .filter((pay: any) => pay.property_id === p.id)
+        .filter((pay: any) => Number(pay.property_id) === pid)
         .reduce((s: number, pay: any) => s + parseFloat(pay.amount || 0), 0)
-      const propCharges = charges.filter((c: any) => c.property_id === p.id)
+      const propCharges = charges.filter((c: any) => Number(c.property_id) === pid)
       const chg: number = propCharges.reduce((s: number, c: any) => s + annualCharge(c), 0)
       return {
         id: p.id,
@@ -380,7 +381,7 @@ exports.declaration2072 = async (req: Request, res: Response) => {
         charges: chg,
         net: rev - chg,
         payments: yearPayments
-          .filter((pay: any) => pay.property_id === p.id)
+          .filter((pay: any) => Number(pay.property_id) === pid)
           .map((pay: any) => ({
             tenantName: pay.Tenant ? `${pay.Tenant.firstname} ${pay.Tenant.lastname}` : '—',
             month: pay.month || '',
