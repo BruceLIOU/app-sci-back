@@ -6,8 +6,19 @@ const db = require('../models')
 
 const ENCRYPTED_FIELDS = ['smtp_pass', 'imap_pass'] as const
 
-function normalizeOwnerProfileType(value: unknown): 'SCI' | 'INDIVIDUAL' {
-  return String(value || '').toUpperCase() === 'SCI' ? 'SCI' : 'INDIVIDUAL'
+type OwnerProfileType = 'SCI' | 'PROFESSIONAL' | 'INDIVIDUAL'
+
+/**
+ * Normalise et valide le type de profil bailleur
+ * - 'SCI' : Société Civile Immobilière
+ * - 'PROFESSIONAL' : Bailleur professionnel (entreprise)
+ * - 'INDIVIDUAL' : Bailleur particulier (personne physique)
+ */
+function normalizeOwnerProfileType(value: unknown): OwnerProfileType {
+  const upper = String(value || '').toUpperCase().trim()
+  if (upper === 'SCI') return 'SCI'
+  if (upper === 'PROFESSIONAL') return 'PROFESSIONAL'
+  return 'INDIVIDUAL'
 }
 
 function decryptConfig(config: any): any {

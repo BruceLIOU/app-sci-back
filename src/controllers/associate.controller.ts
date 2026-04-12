@@ -1,12 +1,45 @@
 import { Request, Response } from 'express'
 const db = require('../models')
-const { Associate } = db
+const { Associate, OwnerConfig } = db
+
+/**
+ * Valide et normalise le rôle selon le type de profil du bailleur
+ * Pour maintenir la cohérence quand le type de profil change
+ */
+async function normalizeRoleByOwnerType(role: string): Promise<string> {
+  try {
+    const ownerConfig = await OwnerConfig.findOne()
+    const ownerType = ownerConfig?.owner_profile_type || 'INDIVIDUAL'
+
+    // Rôles autorisés par type de bailleur
+    const allowedRoles = {
+      'SCI': ['Co-bailleur', 'Bailleur principal', 'Gérant', 'Gérant associé'],
+      'PROFESSIONAL': ['Co-propriétaire', 'Responsable', 'Collaborateur'],
+      'INDIVIDUAL': ['Collaborateur'],
+    }
+
+    const valid = allowedRoles[ownerType as keyof typeof allowedRoles]
+    if (valid && valid.includes(role)) return role
+
+    // Rôle invalide pour ce type de profil, retourner le rôle par défaut
+    const defaults = {
+      'SCI': 'Co-bailleur',
+      'PROFESSIONAL': 'Co-propriétaire',
+      'INDIVIDUAL': 'Collaborateur',
+    }
+    return defaults[ownerType as keyof typeof defaults]
+  } catch {
+    return role || 'Collaborateur'
+  }
+}
 
 exports.create = async (req: Request, res: Response) => {
   const { civility, firstname, lastname, email, phone, address, shares, role } = req.fields
   if (!lastname || !shares) return res.status(400).json({ message: 'Nom et parts obligatoires.' })
   try {
-    const result = await Associate.create({ civility: civility || 'MR', firstname: firstname || '', lastname, email: email || '', phone: phone || '', address: address || '', shares, role: role || 'Co-bailleur' })
+    const roleStr = Array.isArray(role) ? (role[0] || 'Collaborateur') : (role || 'Collaborateur')
+    const normalizedRole = await normalizeRoleByOwnerType(roleStr)
+    const result = await Associate.create({ civility: civility || 'MR', firstname: firstname || '', lastname, email: email || '', phone: phone || '', address: address || '', shares, role: normalizedRole })
     res.status(201).json(result)
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }
@@ -29,7 +62,9 @@ exports.findOne = async (req: Request, res: Response) => {
 exports.update = async (req: Request, res: Response) => {
   const { civility, firstname, lastname, email, phone, address, shares, role } = req.fields
   try {
-    const [num] = await Associate.update({ civility, firstname, lastname, email, phone, address, shares, role }, { where: { id: req.params.id } })
+    const roleStr = Array.isArray(role) ? (role[0] || 'Collaborateur') : (role || 'Collaborateur')
+    const normalizedRole = await normalizeRoleByOwnerType(roleStr)
+    const [num] = await Associate.update({ civility, firstname, lastname, email, phone, address, shares, role: normalizedRole }, { where: { id: req.params.id } })
     if (num > 0) return res.status(200).json({ message: 'Associé mis à jour.' })
     res.status(404).json({ message: 'Associé introuvable.' })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
