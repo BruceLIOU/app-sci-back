@@ -1,5 +1,8 @@
 import { Request, Response } from 'express'
 import cloudinary from '../config/cloudinary.config'
+import { generateAndSaveQuittancePdf } from '../services/pdf.service'
+import { buildZipBuffer, sendPdfByEmail, sendZipByEmail } from '../services/email.service'
+import { generateQuittancePdf } from '../utils/pdf.generator'
 const db = require('../models')
 const { Quittance, Tenant, Property, Lease } = db
 const Document = db.Document
@@ -68,5 +71,113 @@ exports.delete = async (req: Request, res: Response) => {
     const num = await Quittance.destroy({ where: { id } })
     if (num === 1) return res.status(200).json({ message: 'Quittance supprimée.', isDeleted: true })
     res.status(404).json({ message: 'Quittance introuvable.', isDeleted: false })
+  } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
+exports.bulkDelete = async (req: Request, res: Response) => {
+  try {
+    const ids: number[] = JSON.parse((req.fields?.ids as string) || '[]')
+    if (!ids.length) return res.status(400).json({ message: 'Aucun identifiant fourni.' })
+    for (const id of ids) {
+      await deleteEntityDocuments('quittance', id)
+    }
+    const num = await Quittance.destroy({ where: { id: ids } })
+    res.status(200).json({ message: `${num} quittance(s) supprimée(s).`, deleted: num })
+  } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
+exports.bulkGeneratePdf = async (req: Request, res: Response) => {
+  try {
+    const ids: number[] = JSON.parse((req.fields?.ids as string) || '[]')
+    if (!ids.length) return res.status(400).json({ message: 'Aucun identifiant fourni.' })
+    const results = await Promise.allSettled(ids.map((id) => generateAndSaveQuittancePdf(id)))
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length
+    const failed = results.filter((r) => r.status === 'rejected').length
+    res.status(200).json({ message: `${succeeded} PDF généré(s)${failed > 0 ? `, ${failed} erreur(s)` : ''}.`, succeeded, failed })
+  } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
+exports.bulkEmail = async (req: Request, res: Response) => {
+  try {
+    const ids: number[] = JSON.parse((req.fields?.ids as string) || '[]')
+    if (!ids.length) return res.status(400).json({ message: 'Aucun identifiant fourni.' })
+
+    const quittanceInclude = [
+      { model: Property, attributes: ['id', 'type', 'address', 'zipcode', 'city'] },
+      { model: Tenant, attributes: ['id', 'civility', 'firstname', 'lastname', 'email'] },
+    ]
+    const landlord = await db.SciConfig.findOne()
+    const appName = process.env.APP_NAME || 'App SCI'
+
+    const quittances = await Quittance.findAll({ where: { id: ids }, include: quittanceInclude })
+
+    // Grouper par locataire (email)
+    const byEmail: Record<string, { tenant: any; quittances: any[] }> = {}
+    for (const q of quittances) {
+      const email = q.Tenant?.email
+      if (!email) continue
+      if (!byEmail[email]) byEmail[email] = { tenant: q.Tenant, quittances: [] }
+      byEmail[email].quittances.push(q)
+    }
+
+    if (Object.keys(byEmail).length === 0) {
+      return res.status(400).json({ message: 'Aucune quittance avec locataire ayant un email.' })
+    }
+
+    let sent = 0
+    let errors = 0
+
+    for (const [email, { tenant, quittances: tQuittances }] of Object.entries(byEmail)) {
+      try {
+        if (tQuittances.length === 1) {
+          // Un seul PDF — pièce jointe directe
+          const q = tQuittances[0]
+          const buffer = await generateQuittancePdf(q, q.Property, tenant, landlord)
+          const filename = `quittance_${(q.period || 'periode').toLowerCase().replace(/[^a-z0-9]/g, '_')}_${tenant.lastname.toLowerCase()}.pdf`
+          await sendPdfByEmail(
+            email,
+            `Votre quittance de loyer – ${q.period}`,
+            `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2d6a4f;">Quittance de loyer – ${q.period}</h2>
+              <p>Bonjour ${tenant.civility ? tenant.civility + ' ' : ''}${tenant.lastname},</p>
+              <p>Veuillez trouver ci-joint votre quittance de loyer pour la période <strong>${q.period}</strong>.</p>
+              <p>Montant total acquitté : <strong>${parseFloat(q.total_amount).toFixed(2)} €</strong></p>
+              <p>Cordialement,<br><strong>${appName}</strong></p>
+            </div>`,
+            { filename, content: buffer },
+          )
+        } else {
+          // Plusieurs PDFs — ZIP
+          const files: { filename: string; content: Buffer }[] = []
+          for (const q of tQuittances) {
+            const buffer = await generateQuittancePdf(q, q.Property, tenant, landlord)
+            const filename = `quittance_${(q.period || 'periode').toLowerCase().replace(/[^a-z0-9]/g, '_')}_${tenant.lastname.toLowerCase()}.pdf`
+            files.push({ filename, content: buffer })
+          }
+          const zipBuffer = await buildZipBuffer(files)
+          const periods = tQuittances.map((q: any) => q.period).join(', ')
+          await sendZipByEmail(
+            email,
+            `Vos quittances de loyer`,
+            `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2d6a4f;">Vos quittances de loyer</h2>
+              <p>Bonjour ${tenant.civility ? tenant.civility + ' ' : ''}${tenant.lastname},</p>
+              <p>Veuillez trouver ci-joint vos ${tQuittances.length} quittances de loyer (${periods}).</p>
+              <p>Cordialement,<br><strong>${appName}</strong></p>
+            </div>`,
+            { filename: `quittances_${tenant.lastname.toLowerCase()}.zip`, content: zipBuffer },
+          )
+        }
+        sent++
+      } catch {
+        errors++
+      }
+    }
+
+    res.status(200).json({
+      message: `${sent} email(s) envoyé(s)${errors > 0 ? `, ${errors} erreur(s)` : ''}.`,
+      sent,
+      errors,
+    })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }

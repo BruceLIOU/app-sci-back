@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import archiver from 'archiver'
 import { decrypt } from '../utils/crypto.util'
 
 const db = require('../models')
@@ -64,6 +65,36 @@ export async function sendPdfByEmail(
     subject,
     html,
     attachments: [{ filename: attachment.filename, content: attachment.content, contentType: 'application/pdf' }],
+  })
+}
+
+export function buildZipBuffer(files: { filename: string; content: Buffer }[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    const chunks: Buffer[] = []
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk))
+    archive.on('end', () => resolve(Buffer.concat(chunks)))
+    archive.on('error', reject)
+    for (const f of files) {
+      archive.append(f.content, { name: f.filename })
+    }
+    archive.finalize()
+  })
+}
+
+export async function sendZipByEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachment: { filename: string; content: Buffer },
+): Promise<void> {
+  const { transport, from } = await createTransporter()
+  await transport.sendMail({
+    from,
+    to,
+    subject,
+    html,
+    attachments: [{ filename: attachment.filename, content: attachment.content, contentType: 'application/zip' }],
   })
 }
 

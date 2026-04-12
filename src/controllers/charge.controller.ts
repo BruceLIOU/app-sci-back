@@ -46,6 +46,15 @@ exports.delete = async (req: Request, res: Response) => {
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }
 
+exports.bulkDelete = async (req: Request, res: Response) => {
+  try {
+    const ids: number[] = JSON.parse((req.fields?.ids as string) || '[]')
+    if (!ids.length) return res.status(400).json({ message: 'Aucun identifiant fourni.' })
+    const num = await Charge.destroy({ where: { id: ids } })
+    res.status(200).json({ message: `${num} charge(s) supprimée(s).`, deleted: num })
+  } catch (e: any) { res.status(500).json({ message: e.message }) }
+}
+
 exports.syncMatera = async (_req: Request, res: Response) => {
   try {
     const result = await runMateraChargeSync()

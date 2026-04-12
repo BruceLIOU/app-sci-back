@@ -120,3 +120,12 @@ exports.delete = async (req: Request, res: Response) => {
     res.status(404).json({ message: 'Paiement introuvable.', isDeleted: false })
   } catch (e: any) { res.status(500).json({ message: e.message }) }
 }
+
+exports.bulkDelete = async (req: Request, res: Response) => {
+  try {
+    const ids: number[] = JSON.parse((req.fields?.ids as string) || '[]')
+    if (!ids.length) return res.status(400).json({ message: 'Aucun identifiant fourni.' })
+    const num = await Payment.destroy({ where: { id: ids } })
+    res.status(200).json({ message: `${num} paiement(s) supprimé(s).`, deleted: num })
+  } catch (e: any) { res.status(500).json({ message: e.message }) }
+}

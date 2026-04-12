@@ -11,9 +11,11 @@
   "author": "Bruce LIOU",
   "license": "MIT",
   "dependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/google-spreadsheet": "^3.3.2",
     "@types/nodemailer": "^8.0.0",
     "@types/pdfkit": "^0.17.5",
+    "archiver": "^7.0.1",
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
