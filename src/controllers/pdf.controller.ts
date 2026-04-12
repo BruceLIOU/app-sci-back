@@ -11,6 +11,7 @@ import {
   generateDeclaration2072Pdf,
 } from '../utils/pdf.generator'
 import { sendPdfByEmail } from '../services/email.service'
+import { createNotification } from '../services/notification.service'
 
 const db = require('../models')
 
@@ -224,7 +225,15 @@ exports.emailBail = async (req: Request, res: Response) => {
       </div>`,
       { filename, content: buffer },
     )
-    res.json({ message: `Email envoyé à ${tenant.email}` })
+    const now = new Date()
+    await lease.update({ email_sent_at: now })
+    await createNotification({
+      type: 'email_sent',
+      title: `Bail envoyé par email`,
+      message: `Envoyé à ${tenant.email} — ${property?.address || ''}, ${property?.city || ''}`,
+      metadata: { reference_type: 'lease', reference_id: lease.id, recipient: tenant.email },
+    })
+    res.json({ message: `Email envoyé à ${tenant.email}`, email_sent_at: now })
   } catch (e: any) {
     console.error(e)
     res.status(500).json({ message: e.message })
@@ -257,7 +266,15 @@ exports.emailQuittance = async (req: Request, res: Response) => {
       </div>`,
       { filename, content: buffer },
     )
-    res.json({ message: `Email envoyé à ${tenant.email}` })
+    const now = new Date()
+    await quittance.update({ email_sent_at: now })
+    await createNotification({
+      type: 'email_sent',
+      title: `Quittance envoyée par email`,
+      message: `Période ${quittance.period} — envoyée à ${tenant.email}`,
+      metadata: { reference_type: 'quittance', reference_id: quittance.id, recipient: tenant.email },
+    })
+    res.json({ message: `Email envoyé à ${tenant.email}`, email_sent_at: now })
   } catch (e: any) {
     console.error(e)
     res.status(500).json({ message: e.message })
@@ -292,7 +309,15 @@ exports.emailEtatDesLieux = async (req: Request, res: Response) => {
       </div>`,
       { filename, content: buffer },
     )
-    res.json({ message: `Email envoyé à ${tenant.email}` })
+    const now = new Date()
+    await inspection.update({ email_sent_at: now })
+    await createNotification({
+      type: 'email_sent',
+      title: `État des lieux envoyé par email`,
+      message: `EDL d'${typeEntree} — envoyé à ${tenant.email} — ${property?.address || ''}, ${property?.city || ''}`,
+      metadata: { reference_type: 'inspection', reference_id: inspection.id, recipient: tenant.email },
+    })
+    res.json({ message: `Email envoyé à ${tenant.email}`, email_sent_at: now })
   } catch (e: any) {
     console.error(e)
     res.status(500).json({ message: e.message })

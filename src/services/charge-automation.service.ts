@@ -1,5 +1,6 @@
 import { fetchMateraEmails, RawMateraEmail } from './imap.service'
 import { parseMateraEmail, isFundCallEmail } from './matera-parser.service'
+import { createNotification } from './notification.service'
 import { Op } from 'sequelize'
 
 const db = require('../models')
@@ -100,7 +101,7 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
 
     // Créer la charge
     try {
-      await Charge.create({
+      const newCharge = await Charge.create({
         property_id: propertyId,
         type: 'charges_copro',
         description: 'Appel de fonds MATERA (auto)',
@@ -110,6 +111,13 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
       })
 
       await ProcessedEmail.create({ message_id: email.messageId, processed_at: new Date() })
+
+      await createNotification({
+        type: 'matera_charge',
+        title: 'Charge MATERA créée automatiquement',
+        message: `Appel de fonds de ${parsed.amount} € — date : ${parsed.date}`,
+        metadata: { charge_id: newCharge.id, amount: parsed.amount, date: parsed.date, property_id: propertyId },
+      })
 
       console.log(`[MATERA SYNC] Charge créée : ${parsed.amount} € le ${parsed.date}`)
       result.created++

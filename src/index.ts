@@ -55,6 +55,7 @@ require('./routes/pdf.routes')(app)
 require('./routes/sci_config.routes')(app)
 require('./routes/visit.routes')(app)
 require('./routes/user.routes')(app)
+require('./routes/notification.routes')(app)
 
 
 app.get('/', (req: Request, res: Response) => {

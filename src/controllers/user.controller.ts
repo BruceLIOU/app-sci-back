@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import crypto from 'crypto'
 import { sendInvitationEmail } from '../services/email.service'
+import { createNotification } from '../services/notification.service'
 
 const db = require('../models')
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001'
@@ -53,6 +54,12 @@ exports.invite = async (req: Request, res: Response) => {
 
     const activationLink = `${FRONTEND_URL}/#/activate?token=${rawToken}`
     await sendInvitationEmail(email, activationLink)
+    await createNotification({
+      type: 'email_sent',
+      title: 'Invitation utilisateur envoyée',
+      message: `Email d'invitation envoyé à ${email} (rôle : ${role})`,
+      metadata: { reference_type: 'user', reference_id: user.id, recipient: email },
+    })
 
     res.status(201).json({
       id: user.id,
@@ -80,6 +87,12 @@ exports.resendInvite = async (req: Request, res: Response) => {
 
     const activationLink = `${FRONTEND_URL}/#/activate?token=${rawToken}`
     await sendInvitationEmail(user.email, activationLink)
+    await createNotification({
+      type: 'email_sent',
+      title: 'Invitation utilisateur renvoyée',
+      message: `Email d'invitation renvoyé à ${user.email}`,
+      metadata: { reference_type: 'user', reference_id: user.id, recipient: user.email },
+    })
 
     res.json({ message: 'Invitation renvoyée.' })
   } catch (e: any) {

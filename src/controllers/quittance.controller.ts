@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import cloudinary from '../config/cloudinary.config'
 import { generateAndSaveQuittancePdf } from '../services/pdf.service'
 import { buildZipBuffer, sendPdfByEmail, sendZipByEmail } from '../services/email.service'
+import { createNotification } from '../services/notification.service'
 import { generateQuittancePdf } from '../utils/pdf.generator'
 const db = require('../models')
 const { Quittance, Tenant, Property, Lease } = db
@@ -146,6 +147,14 @@ exports.bulkEmail = async (req: Request, res: Response) => {
             </div>`,
             { filename, content: buffer },
           )
+          const now = new Date()
+          await q.update({ email_sent_at: now })
+          await createNotification({
+            type: 'email_sent',
+            title: 'Quittance envoyée par email',
+            message: `Période ${q.period} — envoyée à ${email}`,
+            metadata: { reference_type: 'quittance', reference_id: q.id, recipient: email },
+          })
         } else {
           // Plusieurs PDFs — ZIP
           const files: { filename: string; content: Buffer }[] = []
@@ -167,6 +176,16 @@ exports.bulkEmail = async (req: Request, res: Response) => {
             </div>`,
             { filename: `quittances_${tenant.lastname.toLowerCase()}.zip`, content: zipBuffer },
           )
+          const now = new Date()
+          for (const q of tQuittances) {
+            await q.update({ email_sent_at: now })
+            await createNotification({
+              type: 'email_sent',
+              title: 'Quittance envoyée par email',
+              message: `Période ${q.period} — envoyée à ${email}`,
+              metadata: { reference_type: 'quittance', reference_id: q.id, recipient: email },
+            })
+          }
         }
         sent++
       } catch {

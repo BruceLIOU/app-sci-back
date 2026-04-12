@@ -16,6 +16,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     },
     general_notes: { type: DataTypes.TEXT, allowNull: true },
     rooms: { type: DataTypes.TEXT, allowNull: true, comment: 'JSON array of room conditions' },
+    email_sent_at: { type: DataTypes.DATE, allowNull: true },
   }, {})
 
   return Inspection

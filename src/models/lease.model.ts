@@ -19,6 +19,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
       defaultValue: 'active',
     },
     notes: { type: DataTypes.TEXT, allowNull: true },
+    email_sent_at: { type: DataTypes.DATE, allowNull: true },
   }, {})
 
   return Lease

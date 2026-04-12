@@ -12,6 +12,7 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     charges_amount: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
     total_amount: { type: DataTypes.DECIMAL(10, 2) },
     issue_date: { type: DataTypes.DATEONLY },
+    email_sent_at: { type: DataTypes.DATE, allowNull: true },
   }, {})
 
   return Quittance
