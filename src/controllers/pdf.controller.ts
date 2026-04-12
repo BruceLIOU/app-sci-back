@@ -9,6 +9,7 @@ import {
   generateEtatDesLieuxPdf,
   generateAttestationLoyerPdf,
 } from '../utils/pdf.generator'
+import { sendPdfByEmail } from '../services/email.service'
 
 const db = require('../models')
 
@@ -189,6 +190,108 @@ exports.attestation = async (req: Request, res: Response) => {
     const docLease = await saveDocument(buffer, { title, category: 'justificatif', entity_type: 'lease', entity_id: lease.id, filename })
 
     res.status(201).json({ message: 'PDF généré.', document: docTenant ?? docLease, file_url: (docTenant ?? docLease).file_url })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ message: e.message })
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/pdf/bail/:lease_id/email
+// ─────────────────────────────────────────────────────────────────────────────
+exports.emailBail = async (req: Request, res: Response) => {
+  try {
+    const lease = await db.Lease.findByPk(req.params.lease_id, { include: leaseInclude })
+    if (!lease) return res.status(404).json({ message: 'Bail introuvable.' })
+    const tenant = lease.Tenant
+    if (!tenant?.email) return res.status(400).json({ message: "Le locataire n'a pas d'adresse email." })
+    const property = lease.Property
+    const landlord = await getLandlord()
+    const buffer = await generateBailPdf(lease, property, tenant, landlord)
+    const filename = slug(`bail_${property?.city || 'bien'}_${tenant.lastname}_${lease.start_date || 'date'}`) + '.pdf'
+    const appName = process.env.APP_NAME || 'App SCI'
+    await sendPdfByEmail(
+      tenant.email,
+      `Votre bail de location – ${property?.address || ''}, ${property?.city || ''}`,
+      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d6a4f;">Votre bail de location</h2>
+        <p>Bonjour ${tenant.civility ? tenant.civility + ' ' : ''}${tenant.lastname},</p>
+        <p>Veuillez trouver ci-joint votre bail de location pour le bien situé au :<br>
+        <strong>${property?.address || ''}, ${property?.zipcode || ''} ${property?.city || ''}</strong></p>
+        <p>N'hésitez pas à nous contacter pour toute question.</p>
+        <p>Cordialement,<br><strong>${appName}</strong></p>
+      </div>`,
+      { filename, content: buffer },
+    )
+    res.json({ message: `Email envoyé à ${tenant.email}` })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ message: e.message })
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/pdf/quittance/:quittance_id/email
+// ─────────────────────────────────────────────────────────────────────────────
+exports.emailQuittance = async (req: Request, res: Response) => {
+  try {
+    const quittance = await db.Quittance.findByPk(req.params.quittance_id, { include: quittanceInclude })
+    if (!quittance) return res.status(404).json({ message: 'Quittance introuvable.' })
+    const tenant = quittance.Tenant
+    if (!tenant?.email) return res.status(400).json({ message: "Le locataire n'a pas d'adresse email." })
+    const property = quittance.Property
+    const landlord = await getLandlord()
+    const buffer = await generateQuittancePdf(quittance, property, tenant, landlord)
+    const filename = slug(`quittance_${quittance.period || 'periode'}_${tenant.lastname}`) + '.pdf'
+    const appName = process.env.APP_NAME || 'App SCI'
+    await sendPdfByEmail(
+      tenant.email,
+      `Votre quittance de loyer – ${quittance.period}`,
+      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d6a4f;">Quittance de loyer – ${quittance.period}</h2>
+        <p>Bonjour ${tenant.civility ? tenant.civility + ' ' : ''}${tenant.lastname},</p>
+        <p>Veuillez trouver ci-joint votre quittance de loyer pour la période <strong>${quittance.period}</strong>.</p>
+        <p>Montant total acquitté : <strong>${parseFloat(quittance.total_amount).toFixed(2)} €</strong></p>
+        <p>Cordialement,<br><strong>${appName}</strong></p>
+      </div>`,
+      { filename, content: buffer },
+    )
+    res.json({ message: `Email envoyé à ${tenant.email}` })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ message: e.message })
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/pdf/etat-des-lieux/:inspection_id/email
+// ─────────────────────────────────────────────────────────────────────────────
+exports.emailEtatDesLieux = async (req: Request, res: Response) => {
+  try {
+    const inspection = await db.Inspection.findByPk(req.params.inspection_id, { include: inspectionInclude })
+    if (!inspection) return res.status(404).json({ message: 'État des lieux introuvable.' })
+    const tenant = inspection.Tenant
+    if (!tenant?.email) return res.status(400).json({ message: "Le locataire n'a pas d'adresse email." })
+    const property = inspection.Property
+    const landlord = await getLandlord()
+    const buffer = await generateEtatDesLieuxPdf(inspection, property, tenant, landlord)
+    const typeEntree = inspection.type === 'entree' ? 'entrée' : 'sortie'
+    const filename = slug(`edl_${inspection.type}_${property?.city || 'bien'}_${tenant.lastname}_${inspection.date || 'date'}`) + '.pdf'
+    const appName = process.env.APP_NAME || 'App SCI'
+    await sendPdfByEmail(
+      tenant.email,
+      `État des lieux d'${typeEntree} – ${property?.address || ''}, ${property?.city || ''}`,
+      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d6a4f;">État des lieux d'${typeEntree}</h2>
+        <p>Bonjour ${tenant.civility ? tenant.civility + ' ' : ''}${tenant.lastname},</p>
+        <p>Veuillez trouver ci-joint l'état des lieux d'<strong>${typeEntree}</strong> du bien situé au :<br>
+        <strong>${property?.address || ''}, ${property?.zipcode || ''} ${property?.city || ''}</strong></p>
+        <p>Date : <strong>${inspection.date || ''}</strong></p>
+        <p>Cordialement,<br><strong>${appName}</strong></p>
+      </div>`,
+      { filename, content: buffer },
+    )
+    res.json({ message: `Email envoyé à ${tenant.email}` })
   } catch (e: any) {
     console.error(e)
     res.status(500).json({ message: e.message })

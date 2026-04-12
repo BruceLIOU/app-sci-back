@@ -9,6 +9,11 @@ module.exports = (app: Application) => {
   app.post('/api/pdf/etat-des-lieux/:inspection_id', pdf.etatDesLieux)
   app.post('/api/pdf/attestation/:lease_id', pdf.attestation)
 
+  // Envoi par email (génération à la volée + pièce jointe)
+  app.post('/api/pdf/bail/:lease_id/email', pdf.emailBail)
+  app.post('/api/pdf/quittance/:quittance_id/email', pdf.emailQuittance)
+  app.post('/api/pdf/etat-des-lieux/:inspection_id/email', pdf.emailEtatDesLieux)
+
   // Prévisualisation directe (retourne le PDF sans sauvegarder)
   app.get('/api/pdf/bail/:lease_id/preview', pdf.previewBail)
 }

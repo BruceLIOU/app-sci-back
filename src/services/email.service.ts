@@ -39,6 +39,22 @@ export async function sendInvitationEmail(to: string, activationLink: string): P
   })
 }
 
+export async function sendPdfByEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachment: { filename: string; content: Buffer },
+): Promise<void> {
+  const appName = process.env.APP_NAME || 'App SCI'
+  await transporter.sendMail({
+    from: `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    to,
+    subject,
+    html,
+    attachments: [{ filename: attachment.filename, content: attachment.content, contentType: 'application/pdf' }],
+  })
+}
+
 export async function sendLoginEmail(to: string, loginLink: string): Promise<void> {
   const appName = process.env.APP_NAME || 'App SCI'
   await transporter.sendMail({
