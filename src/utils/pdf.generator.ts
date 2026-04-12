@@ -672,3 +672,368 @@ export async function generateAttestationLoyerPdf(lease: any, property: any, ten
   drawFooter(doc, 'Document établi à la demande du locataire')
   return toBuffer(doc)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. DÉCLARATION 2072-S — SCI soumise à l'IR (art. 8 CGI / art. 46 C CGI)
+//    Revenus fonciers — Formulaire de type Cerfa n°2072-S
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Declaration2072Data {
+  year: number
+  landlord?: LandlordInfo
+  byProperty: {
+    id: number
+    type: string
+    address: string
+    zipcode: string
+    city: string
+    area?: number
+    revenues: number
+    charges: number
+    net: number
+    payments: {
+      tenantName: string
+      month: string
+      paidDate: string
+      amount: number
+    }[]
+    chargeLines: {
+      type: string
+      description?: string
+      frequency: string
+      annualAmount: number
+    }[]
+  }[]
+  byAssociate: {
+    civility?: string
+    firstname: string
+    lastname: string
+    role: string
+    shares: number
+    allocated: number
+  }[]
+  totalRevenues: number
+  totalCharges: number
+  netResult: number
+}
+
+export async function generateDeclaration2072Pdf(data: Declaration2072Data): Promise<Buffer> {
+  const { year, landlord, byProperty, byAssociate, totalRevenues, totalCharges, netResult } = data
+
+  const doc = new PDFDocument({ margin: 40, size: 'A4', info: { Title: `Déclaration 2072-S – ${year}`, Author: 'SCI App' } })
+  const pageW = doc.page.width
+
+  // ── En-tête ────────────────────────────────────────────────────────────────
+  drawHeader(
+    doc,
+    `DÉCLARATION N° 2072-S`,
+    `Sociétés civiles immobilières – Revenus fonciers – Exercice ${year}`,
+  )
+
+  // Référence légale sous l'en-tête
+  doc.y = 90
+  doc.fillColor(GRAY).fontSize(7.5).font('Helvetica')
+    .text(
+      'Cerfa n°2072-S — Art. 8, 8 bis, 8 ter, 60 et 239 ter du CGI — Art. 46 C et 46 D de l\'annexe III au CGI',
+      40, doc.y, { width: pageW - 80, align: 'center' },
+    )
+  doc.y += 14
+
+  // ── I. Identification de la société ───────────────────────────────────────
+  section(doc, 'CADRE I — Identification de la société')
+
+  if (landlord?.name) {
+    row(doc, 'Dénomination sociale', landlordSciName(landlord))
+    row(doc, 'Forme juridique', landlord.legal_form || 'SCI')
+    if (landlord.siret) row(doc, 'N° SIRET', landlord.siret)
+    if (landlord.rcs) row(doc, 'Immatriculation RCS', landlord.rcs)
+    const addr = [landlord.address, landlord.zipcode, landlord.city].filter(Boolean).join(' ')
+    if (addr) row(doc, 'Siège social', addr)
+    if (landlord.manager_civility || landlord.manager_firstname) {
+      row(doc, 'Gérant(e)', landlordManagerName(landlord))
+    }
+  } else {
+    paragraph(doc, '⚠ Informations SCI incomplètes — veuillez renseigner les Paramètres de l\'application.')
+  }
+  row(doc, 'Exercice fiscal', `du 01/01/${year} au 31/12/${year}`)
+  row(doc, 'Régime d\'imposition', 'Impôt sur le revenu (IR) — Art. 8 CGI')
+
+  // ── II. Résultats globaux ─────────────────────────────────────────────────
+  section(doc, 'CADRE II — Résultats de la société')
+
+  // Boîte récapitulative 3 colonnes
+  const boxY2 = doc.y + 4
+  const colW3 = (pageW - 80) / 3
+  const cols = [
+    { label: 'Revenus locatifs bruts', value: fmt(totalRevenues), color: '#27ae60' },
+    { label: 'Charges déductibles totales', value: fmt(totalCharges), color: '#c0392b' },
+    { label: `Résultat net (${netResult >= 0 ? 'bénéfice' : 'déficit'})`, value: fmt(Math.abs(netResult)), color: netResult >= 0 ? '#2980b9' : '#e67e22' },
+  ]
+  cols.forEach((col, i) => {
+    const x = 40 + i * colW3
+    doc.rect(x, boxY2, colW3 - 4, 52).strokeColor(col.color).lineWidth(1).stroke()
+    doc.rect(x, boxY2, colW3 - 4, 16).fill(col.color)
+    doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold')
+      .text(col.label.toUpperCase(), x + 4, boxY2 + 4, { width: colW3 - 12, lineBreak: false })
+    doc.fillColor(col.color).fontSize(13).font('Helvetica-Bold')
+      .text(col.value, x + 4, boxY2 + 24, { width: colW3 - 12, align: 'center' })
+  })
+  doc.y = boxY2 + 60
+  doc.fillColor('#000000')
+
+  paragraph(doc,
+    netResult >= 0
+      ? `La société dégage un bénéfice net de ${fmt(netResult)} au titre de l'exercice ${year}. Ce bénéfice est imposable entre les mains des associés à proportion de leurs parts (art. 8 CGI).`
+      : `La société dégage un déficit net de ${fmt(Math.abs(netResult))} au titre de l'exercice ${year}. Ce déficit est imputable sur les revenus fonciers des associés à proportion de leurs parts (art. 156 I CGI), dans la limite de 10 700 €.`,
+  )
+
+  // ── III. Liste des immeubles ──────────────────────────────────────────────
+  section(doc, 'CADRE III — Immeubles donnés en location (art. 46 C ann. III CGI)')
+
+  if (byProperty.length === 0) {
+    paragraph(doc, 'Aucun bien immobilier enregistré pour cet exercice.')
+  } else {
+    // En-têtes tableau
+    const colsP = [
+      { label: 'Désignation du bien', x: 40, w: 180 },
+      { label: 'Adresse', x: 220, w: 130 },
+      { label: 'Revenus bruts', x: 350, w: 75 },
+      { label: 'Charges', x: 425, w: 65 },
+      { label: 'Résultat net', x: 490, w: 75 },
+    ]
+    const thY = doc.y + 2
+    doc.rect(40, thY, pageW - 80, 16).fill(BLUE)
+    colsP.forEach(c => {
+      doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold')
+        .text(c.label, c.x + 2, thY + 4, { width: c.w - 4, lineBreak: false })
+    })
+    doc.y = thY + 20
+    doc.fillColor('#000000')
+
+    byProperty.forEach((p, idx) => {
+      if (doc.y > doc.page.height - 120) { doc.addPage(); doc.y = 50 }
+      const rowY = doc.y
+      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
+      doc.rect(40, rowY - 2, pageW - 80, 16).fill(bg)
+
+      const propName = `${p.type || ''}${p.area ? ` (${p.area} m²)` : ''}`
+      const propAddr = [p.address, p.zipcode, p.city].filter(Boolean).join(' ')
+      const netColor = p.net >= 0 ? '#27ae60' : '#c0392b'
+
+      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+        .text(propName, colsP[0].x + 2, rowY + 2, { width: colsP[0].w - 4, lineBreak: false })
+      doc.fillColor(GRAY).font('Helvetica')
+        .text(propAddr, colsP[1].x + 2, rowY + 2, { width: colsP[1].w - 4, lineBreak: false })
+      doc.fillColor('#000000')
+        .text(fmt(p.revenues), colsP[2].x + 2, rowY + 2, { width: colsP[2].w - 4, align: 'right', lineBreak: false })
+        .text(fmt(p.charges), colsP[3].x + 2, rowY + 2, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
+      doc.fillColor(netColor).font('Helvetica-Bold')
+        .text(`${p.net >= 0 ? '+' : ''}${fmt(p.net)}`, colsP[4].x + 2, rowY + 2, { width: colsP[4].w - 4, align: 'right', lineBreak: false })
+
+      doc.y = rowY + 16
+    })
+
+    // Ligne total
+    doc.y += 2
+    doc.rect(40, doc.y, pageW - 80, 18).fill(BLUE)
+    const tY = doc.y + 4
+    doc.fillColor('white').fontSize(8.5).font('Helvetica-Bold')
+      .text('TOTAUX', 42, tY, { width: 180, lineBreak: false })
+      .text(fmt(totalRevenues), colsP[2].x + 2, tY, { width: colsP[2].w - 4, align: 'right', lineBreak: false })
+      .text(fmt(totalCharges), colsP[3].x + 2, tY, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
+      .text(`${netResult >= 0 ? '+' : ''}${fmt(netResult)}`, colsP[4].x + 2, tY, { width: colsP[4].w - 4, align: 'right', lineBreak: false })
+    doc.y = tY + 18
+    doc.fillColor('#000000')
+  }
+
+  // ── IV. Charges déductibles (art. 31 CGI) ────────────────────────────────
+  doc.y += 4
+  if (doc.y > doc.page.height - 160) { doc.addPage(); doc.y = 50 }
+  section(doc, 'CADRE IV — Détail des charges déductibles (art. 31 CGI)')
+
+  paragraph(doc,
+    'Sont déductibles notamment : les frais de gestion et d\'administration, les primes d\'assurance, les dépenses de réparation et d\'entretien, ' +
+    'les provisions pour charges de copropriété, les intérêts d\'emprunts (art. 31-I CGI).',
+  )
+
+  // Tableau des charges par bien
+  const allChargeLines = byProperty.flatMap(p =>
+    p.chargeLines.map(c => ({ ...c, propLabel: `${p.type} – ${p.city}` }))
+  )
+
+  if (allChargeLines.length > 0) {
+    const chCols = [
+      { label: 'Bien', x: 40, w: 120 },
+      { label: 'Catégorie', x: 160, w: 100 },
+      { label: 'Description', x: 260, w: 130 },
+      { label: 'Périodicité', x: 390, w: 70 },
+      { label: 'Montant annuel', x: 460, w: 95 },
+    ]
+    const chThY = doc.y + 2
+    doc.rect(40, chThY, pageW - 80, 16).fill(LIGHT)
+    chCols.forEach(c => {
+      doc.fillColor(BLUE).fontSize(7.5).font('Helvetica-Bold')
+        .text(c.label, c.x + 2, chThY + 4, { width: c.w - 4, lineBreak: false })
+    })
+    doc.y = chThY + 20
+    doc.fillColor('#000000')
+
+    allChargeLines.forEach((c, idx) => {
+      if (doc.y > doc.page.height - 80) { doc.addPage(); doc.y = 50 }
+      const rY = doc.y
+      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
+      doc.rect(40, rY - 2, pageW - 80, 16).fill(bg)
+      doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+        .text(c.propLabel, chCols[0].x + 2, rY + 2, { width: chCols[0].w - 4, lineBreak: false })
+        .text(c.type || '—', chCols[1].x + 2, rY + 2, { width: chCols[1].w - 4, lineBreak: false })
+        .text(c.description || '—', chCols[2].x + 2, rY + 2, { width: chCols[2].w - 4, lineBreak: false })
+        .text(c.frequency || '—', chCols[3].x + 2, rY + 2, { width: chCols[3].w - 4, lineBreak: false })
+      doc.fillColor('#000000').font('Helvetica-Bold')
+        .text(fmt(c.annualAmount), chCols[4].x + 2, rY + 2, { width: chCols[4].w - 4, align: 'right', lineBreak: false })
+      doc.y = rY + 16
+    })
+
+    doc.y += 2
+    doc.rect(40, doc.y, pageW - 80, 18).fill(LIGHT)
+    const ctY = doc.y + 4
+    doc.fillColor(BLUE).fontSize(8.5).font('Helvetica-Bold')
+      .text('TOTAL CHARGES DÉDUCTIBLES', 42, ctY, { width: 300, lineBreak: false })
+      .text(fmt(totalCharges), chCols[4].x + 2, ctY, { width: chCols[4].w - 4, align: 'right', lineBreak: false })
+    doc.y = ctY + 18
+    doc.fillColor('#000000')
+  } else {
+    paragraph(doc, 'Aucune charge enregistrée pour cet exercice.')
+  }
+
+  // ── V. Quote-part par associé (art. 8 CGI) ────────────────────────────────
+  doc.y += 4
+  if (doc.y > doc.page.height - 160) { doc.addPage(); doc.y = 50 }
+  section(doc, 'CADRE V — Répartition du résultat entre associés (art. 8 et 60 CGI)')
+
+  paragraph(doc,
+    'Chaque associé déclare sa quote-part du résultat net dans sa déclaration de revenus personnelle (formulaire 2044 ou 2042) ' +
+    'à proportion de ses droits dans la société. En cas de déficit, l\'imputation est limitée à 10 700 € par an sur le revenu global (art. 156 I CGI).',
+  )
+
+  if (byAssociate.length > 0) {
+    const asCols = [
+      { label: 'Associé(e)', x: 40, w: 180 },
+      { label: 'Rôle', x: 220, w: 80 },
+      { label: 'Quote-part (%)', x: 300, w: 90 },
+      { label: 'Résultat attribué', x: 390, w: 105 },
+      { label: 'Nature', x: 495, w: 70 },
+    ]
+    const asThY = doc.y + 2
+    doc.rect(40, asThY, pageW - 80, 16).fill(BLUE)
+    asCols.forEach(c => {
+      doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold')
+        .text(c.label, c.x + 2, asThY + 4, { width: c.w - 4, lineBreak: false })
+    })
+    doc.y = asThY + 20
+    doc.fillColor('#000000')
+
+    byAssociate.forEach((a, idx) => {
+      if (doc.y > doc.page.height - 80) { doc.addPage(); doc.y = 50 }
+      const rY = doc.y
+      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
+      doc.rect(40, rY - 2, pageW - 80, 16).fill(bg)
+      const fullName = [a.civility, a.firstname, a.lastname].filter(Boolean).join(' ')
+      const nature = a.allocated >= 0 ? 'Bénéfice' : 'Déficit'
+      const fc = a.allocated >= 0 ? '#27ae60' : '#c0392b'
+      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+        .text(fullName, asCols[0].x + 2, rY + 2, { width: asCols[0].w - 4, lineBreak: false })
+      doc.font('Helvetica').fillColor(GRAY)
+        .text(a.role || '—', asCols[1].x + 2, rY + 2, { width: asCols[1].w - 4, lineBreak: false })
+        .text(`${Number(a.shares).toFixed(2)} %`, asCols[2].x + 2, rY + 2, { width: asCols[2].w - 4, align: 'right', lineBreak: false })
+      doc.fillColor(fc).font('Helvetica-Bold')
+        .text(fmt(Math.abs(a.allocated)), asCols[3].x + 2, rY + 2, { width: asCols[3].w - 4, align: 'right', lineBreak: false })
+      doc.fillColor(fc).font('Helvetica')
+        .text(nature, asCols[4].x + 2, rY + 2, { width: asCols[4].w - 4, lineBreak: false })
+      doc.y = rY + 16
+    })
+  } else {
+    paragraph(doc, 'Aucun associé enregistré.')
+  }
+
+  // ── VI. Détail des loyers perçus ──────────────────────────────────────────
+  doc.addPage()
+  doc.y = 50
+  section(doc, `CADRE VI — Détail des loyers perçus — Exercice ${year}`)
+
+  const allPayments = byProperty.flatMap(p =>
+    p.payments.map(pay => ({ ...pay, propLabel: `${p.type} – ${p.city}` }))
+  )
+
+  if (allPayments.length === 0) {
+    paragraph(doc, `Aucun loyer encaissé au titre de l'exercice ${year}.`)
+  } else {
+    const pyCols = [
+      { label: 'Bien', x: 40, w: 140 },
+      { label: 'Locataire', x: 180, w: 140 },
+      { label: 'Période', x: 320, w: 80 },
+      { label: 'Date paiement', x: 400, w: 85 },
+      { label: 'Montant', x: 485, w: 80 },
+    ]
+    const pyThY = doc.y + 2
+    doc.rect(40, pyThY, pageW - 80, 16).fill(BLUE)
+    pyCols.forEach(c => {
+      doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold')
+        .text(c.label, c.x + 2, pyThY + 4, { width: c.w - 4, lineBreak: false })
+    })
+    doc.y = pyThY + 20
+    doc.fillColor('#000000')
+
+    let pageTotal = 0
+    allPayments.forEach((p, idx) => {
+      if (doc.y > doc.page.height - 80) { doc.addPage(); doc.y = 50 }
+      const rY = doc.y
+      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
+      doc.rect(40, rY - 2, pageW - 80, 16).fill(bg)
+      doc.fillColor(GRAY).fontSize(8).font('Helvetica')
+        .text(p.propLabel, pyCols[0].x + 2, rY + 2, { width: pyCols[0].w - 4, lineBreak: false })
+        .text(p.tenantName, pyCols[1].x + 2, rY + 2, { width: pyCols[1].w - 4, lineBreak: false })
+        .text(p.month || '—', pyCols[2].x + 2, rY + 2, { width: pyCols[2].w - 4, lineBreak: false })
+        .text(fmtDate(p.paidDate), pyCols[3].x + 2, rY + 2, { width: pyCols[3].w - 4, lineBreak: false })
+      doc.fillColor('#000000').font('Helvetica-Bold')
+        .text(fmt(p.amount), pyCols[4].x + 2, rY + 2, { width: pyCols[4].w - 4, align: 'right', lineBreak: false })
+      doc.y = rY + 16
+      pageTotal += p.amount
+    })
+
+    doc.y += 2
+    doc.rect(40, doc.y, pageW - 80, 18).fill(BLUE)
+    const pyTotY = doc.y + 4
+    doc.fillColor('white').fontSize(8.5).font('Helvetica-Bold')
+      .text('TOTAL REVENUS LOCATIFS', 42, pyTotY, { lineBreak: false })
+      .text(fmt(totalRevenues), pyCols[4].x + 2, pyTotY, { width: pyCols[4].w - 4, align: 'right', lineBreak: false })
+    doc.y = pyTotY + 18
+    doc.fillColor('#000000')
+  }
+
+  // ── VII. Déclaration et engagement ────────────────────────────────────────
+  doc.y += 8
+  if (doc.y > doc.page.height - 140) { doc.addPage(); doc.y = 50 }
+  section(doc, 'CADRE VII — Déclaration et engagement du gérant')
+
+  const sciName = landlord?.name ? landlordSciName(landlord) : '(la société)'
+  const gerant = landlord?.manager_firstname
+    ? landlordManagerName(landlord)
+    : '(le gérant)'
+
+  paragraph(doc,
+    `Je soussigné(e), ${gerant}, gérant(e) de la société ${sciName}, certifie l'exactitude des renseignements portés sur la présente déclaration ` +
+    `et m'engage à tenir à la disposition de l'Administration fiscale tout document justificatif permettant de vérifier les éléments déclarés, ` +
+    `conformément aux dispositions des articles 46 C et 46 D de l'annexe III au CGI.`,
+  )
+  paragraph(doc,
+    `Cette déclaration est souscrite au titre de l'article 60 du CGI. Le dépôt est effectué au plus tard le deuxième jour ouvré suivant ` +
+    `le 1er mai de l'année suivant l'exercice fiscal, conformément à l'article 175 du CGI.`,
+  )
+
+  row(doc, 'Lieu et date de signature',
+    `${landlord?.city || '—'}, le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`)
+  signatureBlock(doc, 'Signature du gérant et cachet de la société', '')
+
+  drawFooter(doc, `Document établi conformément au Cerfa n°2072-S — Exercice ${year}`)
+  return toBuffer(doc)
+}

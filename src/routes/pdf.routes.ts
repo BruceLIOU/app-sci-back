@@ -16,4 +16,7 @@ module.exports = (app: Application) => {
 
   // Prévisualisation directe (retourne le PDF sans sauvegarder)
   app.get('/api/pdf/bail/:lease_id/preview', pdf.previewBail)
+
+  // Déclaration annuelle 2072-S (revenus fonciers SCI — art. 8 CGI)
+  app.get('/api/pdf/declaration-2072', pdf.declaration2072)
 }

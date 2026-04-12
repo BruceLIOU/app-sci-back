@@ -8,6 +8,7 @@ import {
   generateQuittancePdf,
   generateEtatDesLieuxPdf,
   generateAttestationLoyerPdf,
+  generateDeclaration2072Pdf,
 } from '../utils/pdf.generator'
 import { sendPdfByEmail } from '../services/email.service'
 
@@ -311,6 +312,112 @@ exports.previewBail = async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `inline; filename="bail_preview.pdf"`)
     res.send(buffer)
   } catch (e: any) {
+    res.status(500).json({ message: e.message })
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/pdf/declaration-2072?year=2025
+// Génère et retourne en téléchargement la déclaration 2072-S (art. 8 CGI)
+// ─────────────────────────────────────────────────────────────────────────────
+exports.declaration2072 = async (req: Request, res: Response) => {
+  try {
+    const year = parseInt((req.query.year as string) || String(new Date().getFullYear()), 10)
+    if (isNaN(year) || year < 2000 || year > new Date().getFullYear()) {
+      return res.status(400).json({ message: 'Année invalide.' })
+    }
+
+    const [payments, charges, associates, properties, landlord] = await Promise.all([
+      db.Payment.findAll({
+        where: { status: 'paid' },
+        include: [
+          { model: db.Tenant, attributes: ['id', 'civility', 'firstname', 'lastname'] },
+          { model: db.Property, attributes: ['id', 'type', 'address', 'zipcode', 'city', 'area'] },
+        ],
+      }),
+      db.Charge.findAll({
+        include: [{ model: db.Property, attributes: ['id', 'type', 'city'] }],
+      }),
+      db.Associate.findAll(),
+      db.Property.findAll(),
+      db.SciConfig.findOne(),
+    ])
+
+    const yearStr = String(year)
+    const yearPayments = payments.filter((p: any) => {
+      const d: string = p.paid_date || p.due_date || ''
+      return d.startsWith(yearStr)
+    })
+
+    const totalRevenues: number = yearPayments.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0)
+
+    const annualCharge = (c: any): number => {
+      const a = parseFloat(c.amount || 0)
+      const d: string = c.date || ''
+      if (d.startsWith(yearStr)) return a
+      if (c.frequency === 'mensuel') return a * 12
+      if (c.frequency === 'trimestriel') return a * 4
+      if (c.frequency === 'annuel') return a
+      return 0
+    }
+    const totalCharges: number = charges.reduce((s: number, c: any) => s + annualCharge(c), 0)
+    const netResult: number = totalRevenues - totalCharges
+
+    const byProperty = properties.map((p: any) => {
+      const rev: number = yearPayments
+        .filter((pay: any) => pay.property_id === p.id)
+        .reduce((s: number, pay: any) => s + parseFloat(pay.amount || 0), 0)
+      const propCharges = charges.filter((c: any) => c.property_id === p.id)
+      const chg: number = propCharges.reduce((s: number, c: any) => s + annualCharge(c), 0)
+      return {
+        id: p.id,
+        type: p.type || '',
+        address: p.address || '',
+        zipcode: p.zipcode || '',
+        city: p.city || '',
+        area: p.area,
+        revenues: rev,
+        charges: chg,
+        net: rev - chg,
+        payments: yearPayments
+          .filter((pay: any) => pay.property_id === p.id)
+          .map((pay: any) => ({
+            tenantName: pay.Tenant ? `${pay.Tenant.firstname} ${pay.Tenant.lastname}` : '—',
+            month: pay.month || '',
+            paidDate: pay.paid_date || '',
+            amount: parseFloat(pay.amount || 0),
+          })),
+        chargeLines: propCharges.map((c: any) => ({
+          type: c.type || '',
+          description: c.description || '',
+          frequency: c.frequency || '',
+          annualAmount: annualCharge(c),
+        })),
+      }
+    })
+
+    const byAssociate = associates.map((a: any) => {
+      const shares = parseFloat(a.shares || 0)
+      return {
+        civility: a.civility,
+        firstname: a.firstname || '',
+        lastname: a.lastname || '',
+        role: a.role || '',
+        shares,
+        allocated: (netResult * shares) / 100,
+      }
+    })
+
+    const buffer = await generateDeclaration2072Pdf({
+      year, landlord, byProperty, byAssociate, totalRevenues, totalCharges, netResult,
+    })
+
+    const filename = `declaration_2072_S_${year}.pdf`
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(buffer)
+  } catch (e: any) {
+    console.error(e)
     res.status(500).json({ message: e.message })
   }
 }
