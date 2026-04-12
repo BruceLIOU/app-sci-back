@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import * as AuthGoogleService from '../services/auth-google.service'
+import cloudinary from '../config/cloudinary.config'
+import * as EmailService from '../services/email.service'
 
 const db = require('../models')
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001'
@@ -22,64 +23,61 @@ function setTokenCookie(res: Response, token: string) {
   })
 }
 
-// GET /api/auth/google/url
-exports.getGoogleUrl = (_req: Request, res: Response) => {
+// POST /api/auth/request-login — envoyer un magic link de connexion
+exports.requestLogin = async (req: Request, res: Response) => {
+  const email = (req as any).fields?.email || req.body?.email
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'Email requis.' })
+  }
   try {
-    const url = AuthGoogleService.getAuthUrl()
-    res.json({ url })
+    const user = await db.User.findOne({ where: { email: email.toLowerCase().trim() } })
+    // Réponse générique pour ne pas révéler l'existence du compte
+    if (!user || user.status !== 'active') {
+      return res.json({ message: 'Si votre email est connu, vous recevrez un lien de connexion.' })
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+    const expiry = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+
+    await user.update({ login_token_hash: tokenHash, login_token_expiry: expiry })
+
+    const backendUrl = `${req.protocol}://${req.get('host')}`
+    const loginLink = `${backendUrl}/api/auth/verify-login?token=${rawToken}`
+    await EmailService.sendLoginEmail(user.email, loginLink)
+
+    res.json({ message: 'Si votre email est connu, vous recevrez un lien de connexion.' })
   } catch (e: any) {
-    res.status(500).json({ message: e.message })
+    console.error('Request login error:', e.message)
+    res.status(500).json({ message: 'Erreur serveur.' })
   }
 }
 
-// GET /api/auth/google/callback
-exports.googleCallback = async (req: Request, res: Response) => {
-  const { code } = req.query
-  if (!code || typeof code !== 'string') {
-    return res.redirect(`${FRONTEND_URL}/#/login?error=missing_code`)
+// GET /api/auth/verify-login?token=<token> — valider le magic link de connexion
+exports.verifyLogin = async (req: Request, res: Response) => {
+  const { token } = req.query
+  if (!token || typeof token !== 'string') {
+    return res.redirect(`${FRONTEND_URL}/#/login?error=invalid_token`)
   }
   try {
-    const profile = await AuthGoogleService.getUserProfile(code)
-
-    // 1. Chercher par google_id (utilisateur déjà connecté au moins une fois)
-    let user = await db.User.findOne({ where: { google_id: profile.google_id } })
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const user = await db.User.findOne({ where: { login_token_hash: tokenHash } })
 
     if (!user) {
-      // 2. Chercher par email (utilisateur invité qui n'a pas encore lié son compte Google)
-      const invitedUser = await db.User.findOne({ where: { email: profile.email } })
-
-      if (invitedUser) {
-        if (invitedUser.status !== 'active') {
-          return res.redirect(`${FRONTEND_URL}/#/login?error=account_not_activated`)
-        }
-        // Lier le compte Google à l'invitation
-        await invitedUser.update({
-          google_id: profile.google_id,
-          name: invitedUser.name || profile.name,
-          avatar: profile.avatar,
-        })
-        user = invitedUser
-      } else {
-        // 3. Premier utilisateur de l'application → admin automatique
-        const count = await db.User.count()
-        if (count > 0) {
-          return res.redirect(`${FRONTEND_URL}/#/login?error=not_invited`)
-        }
-        user = await db.User.create({
-          ...profile,
-          role: 'admin',
-          status: 'active',
-        })
-      }
-    } else {
-      await user.update({ name: profile.name, avatar: profile.avatar })
+      return res.redirect(`${FRONTEND_URL}/#/login?error=invalid_token`)
+    }
+    if (!user.login_token_expiry || new Date() > new Date(user.login_token_expiry)) {
+      return res.redirect(`${FRONTEND_URL}/#/login?error=expired_token`)
     }
 
-    const token = issueToken(user.id)
-    setTokenCookie(res, token)
+    // Invalider le token (usage unique)
+    await user.update({ login_token_hash: null, login_token_expiry: null })
+
+    const jwt_token = issueToken(user.id)
+    setTokenCookie(res, jwt_token)
     res.redirect(`${FRONTEND_URL}/#/dashboard`)
   } catch (e: any) {
-    console.error('Auth Google callback error:', e.message)
+    console.error('Verify login error:', e.message)
     res.redirect(`${FRONTEND_URL}/#/login?error=auth_failed`)
   }
 }
@@ -174,5 +172,45 @@ exports.updateProfile = async (req: Request, res: Response) => {
     })
   } catch (e: any) {
     res.status(500).json({ message: e.message })
+  }
+}
+
+interface FormidableFile {
+  name: string
+  path: string
+  size: number
+  type: string
+}
+
+// POST /api/auth/avatar — upload d'avatar via Cloudinary
+exports.uploadAvatar = async (req: Request, res: Response) => {
+  const file = req.files?.avatar as FormidableFile | undefined
+  if (!file) {
+    return res.status(400).json({ message: 'Aucun fichier envoyé.' })
+  }
+  if (!file.type.startsWith('image/')) {
+    return res.status(400).json({ message: 'Le fichier doit être une image.' })
+  }
+  try {
+    const user = (req as any).user
+
+    // Supprimer l'ancien avatar Cloudinary si présent
+    if (user.avatar && user.avatar.includes('cloudinary.com')) {
+      const match = user.avatar.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/i)
+      if (match) {
+        await cloudinary.uploader.destroy(match[1]).catch(() => {})
+      }
+    }
+
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: 'sci/avatars',
+      transformation: [{ width: 200, height: 200, crop: 'fill', gravity: 'face' }],
+    })
+
+    await user.update({ avatar: result.secure_url })
+    res.json({ avatar: result.secure_url })
+  } catch (e: any) {
+    console.error('Upload avatar error:', e.message)
+    res.status(500).json({ message: "Erreur lors de l'upload de l'avatar." })
   }
 }

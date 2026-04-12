@@ -19,6 +19,9 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
     // Token d'invitation (hashé SHA-256 en base)
     invite_token_hash: { type: DataTypes.STRING, allowNull: true },
     invite_token_expiry: { type: DataTypes.DATE, allowNull: true },
+    // Token de connexion magic link (hashé SHA-256 en base)
+    login_token_hash: { type: DataTypes.STRING, allowNull: true },
+    login_token_expiry: { type: DataTypes.DATE, allowNull: true },
     // JSON stringifié : { darkMode: false, ... }
     preferences: {
       type: DataTypes.TEXT,
