@@ -793,13 +793,13 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
   if (byProperty.length === 0) {
     paragraph(doc, 'Aucun bien immobilier enregistré pour cet exercice.')
   } else {
-    // En-têtes tableau
+    // En-têtes tableau — colonnes réparties dans la zone de contenu (40 à 555)
     const colsP = [
-      { label: 'Désignation du bien', x: 40, w: 180 },
-      { label: 'Adresse', x: 220, w: 130 },
-      { label: 'Revenus bruts', x: 350, w: 75 },
-      { label: 'Charges', x: 425, w: 65 },
-      { label: 'Résultat net', x: 490, w: 75 },
+      { label: 'Désignation du bien', x: 40,  w: 155 }, // 40→195
+      { label: 'Adresse',            x: 195, w: 130 }, // 195→325
+      { label: 'Revenus bruts',      x: 325, w: 76  }, // 325→401
+      { label: 'Charges',            x: 401, w: 68  }, // 401→469
+      { label: 'Résultat net',       x: 469, w: 76  }, // 469→545 ✓
     ]
     const thY = doc.y + 2
     doc.rect(40, thY, pageW - 80, 16).fill(BLUE)
@@ -811,26 +811,36 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
     doc.fillColor('#000000')
 
     byProperty.forEach((p, idx) => {
-      if (doc.y > doc.page.height - 120) { doc.addPage(); doc.y = 50 }
-      const rowY = doc.y
-      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
-      doc.rect(40, rowY - 2, pageW - 80, 16).fill(bg)
-
       const propName = `${p.type || ''}${p.area ? ` (${p.area} m²)` : ''}`
       const propAddr = [p.address, p.zipcode, p.city].filter(Boolean).join(' ')
+
+      // Hauteur de ligne dynamique selon le contenu le plus haut
+      doc.fontSize(8).font('Helvetica-Bold')
+      const h0 = doc.heightOfString(propName, { width: colsP[0].w - 4 })
+      doc.font('Helvetica')
+      const h1 = doc.heightOfString(propAddr, { width: colsP[1].w - 4 })
+      const rowH = Math.max(h0, h1, 14) + 8
+
+      if (doc.y + rowH > doc.page.height - 60) { doc.addPage(); doc.y = 50 }
+      const rowY = doc.y
+      const bg = idx % 2 === 0 ? '#f9fafb' : 'white'
+      doc.rect(40, rowY - 2, pageW - 80, rowH).fill(bg)
+
       const netColor = p.net >= 0 ? '#27ae60' : '#c0392b'
+      // Centrage vertical pour les colonnes numériques (1 ligne)
+      const numY = rowY + (rowH - 10) / 2
 
       doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-        .text(propName, colsP[0].x + 2, rowY + 2, { width: colsP[0].w - 4, lineBreak: false })
+        .text(propName, colsP[0].x + 2, rowY + 2, { width: colsP[0].w - 4 })
       doc.fillColor(GRAY).font('Helvetica')
-        .text(propAddr, colsP[1].x + 2, rowY + 2, { width: colsP[1].w - 4, lineBreak: false })
+        .text(propAddr, colsP[1].x + 2, rowY + 2, { width: colsP[1].w - 4 })
       doc.fillColor('#000000')
-        .text(fmt(p.revenues), colsP[2].x + 2, rowY + 2, { width: colsP[2].w - 4, align: 'right', lineBreak: false })
-        .text(fmt(p.charges), colsP[3].x + 2, rowY + 2, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
+        .text(fmt(p.revenues), colsP[2].x + 2, numY, { width: colsP[2].w - 4, align: 'right', lineBreak: false })
+        .text(fmt(p.charges),  colsP[3].x + 2, numY, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
       doc.fillColor(netColor).font('Helvetica-Bold')
-        .text(`${p.net >= 0 ? '+' : ''}${fmt(p.net)}`, colsP[4].x + 2, rowY + 2, { width: colsP[4].w - 4, align: 'right', lineBreak: false })
+        .text(`${p.net >= 0 ? '+' : ''}${fmt(p.net)}`, colsP[4].x + 2, numY, { width: colsP[4].w - 4, align: 'right', lineBreak: false })
 
-      doc.y = rowY + 16
+      doc.y = rowY + rowH
     })
 
     // Ligne total
@@ -838,9 +848,9 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
     doc.rect(40, doc.y, pageW - 80, 18).fill(BLUE)
     const tY = doc.y + 4
     doc.fillColor('white').fontSize(8.5).font('Helvetica-Bold')
-      .text('TOTAUX', 42, tY, { width: 180, lineBreak: false })
+      .text('TOTAUX',           colsP[0].x + 2, tY, { width: colsP[0].w + colsP[1].w - 4, lineBreak: false })
       .text(fmt(totalRevenues), colsP[2].x + 2, tY, { width: colsP[2].w - 4, align: 'right', lineBreak: false })
-      .text(fmt(totalCharges), colsP[3].x + 2, tY, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
+      .text(fmt(totalCharges),  colsP[3].x + 2, tY, { width: colsP[3].w - 4, align: 'right', lineBreak: false })
       .text(`${netResult >= 0 ? '+' : ''}${fmt(netResult)}`, colsP[4].x + 2, tY, { width: colsP[4].w - 4, align: 'right', lineBreak: false })
     doc.y = tY + 18
     doc.fillColor('#000000')
@@ -956,8 +966,8 @@ export async function generateDeclaration2072Pdf(data: Declaration2072Data): Pro
   }
 
   // ── VI. Détail des loyers perçus ──────────────────────────────────────────
-  doc.addPage()
-  doc.y = 50
+  doc.y += 4
+  if (doc.y > doc.page.height - 180) { doc.addPage(); doc.y = 50 }
   section(doc, `CADRE VI — Détail des loyers perçus — Exercice ${year}`)
 
   const allPayments = byProperty.flatMap(p =>
