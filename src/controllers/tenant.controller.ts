@@ -113,6 +113,18 @@ exports.update = async (req: Request, res: Response) => {
   }
 }
 
+exports.toggleActive = async (req: Request, res: Response) => {
+  const id = req.params.id
+  try {
+    const tenant = await Tenant.findByPk(id)
+    if (!tenant) return res.status(404).json({ message: `Locataire avec id=${id} introuvable.` })
+    await tenant.update({ is_active: !tenant.is_active })
+    res.status(200).json({ is_active: tenant.is_active })
+  } catch (error: any) {
+    res.status(500).json({ message: 'Erreur lors du changement de statut du locataire id=' + id })
+  }
+}
+
 exports.delete = async (req: Request, res: Response) => {
   const id = req.params.id
   try {

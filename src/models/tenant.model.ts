@@ -42,6 +42,10 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
         type: DataTypes.STRING,
         allowNull: true,
       },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
     },
     {}
   )
