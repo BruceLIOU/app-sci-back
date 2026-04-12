@@ -27,6 +27,7 @@ exports.getAll = async (_req: Request, res: Response) => {
 exports.invite = async (req: Request, res: Response) => {
   const f = (req as any).fields || {}
   const email = (f.email as string)?.trim().toLowerCase()
+  const name = (f.name as string)?.trim() || null
   const role = (f.role as string) || 'viewer'
 
   if (!email) return res.status(400).json({ message: "L'email est requis." })
@@ -43,6 +44,7 @@ exports.invite = async (req: Request, res: Response) => {
 
     const user = await db.User.create({
       email,
+      name,
       role,
       status: 'pending',
       invite_token_hash: tokenHash,
