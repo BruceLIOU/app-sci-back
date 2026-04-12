@@ -1,6 +1,8 @@
 import imapSimple, { ImapSimple, Message } from 'imap-simple'
 import { simpleParser, ParsedMail } from 'mailparser'
 
+const db = require('../models')
+
 export interface RawMateraEmail {
   messageId: string
   text: string
@@ -9,16 +11,21 @@ export interface RawMateraEmail {
 }
 
 export async function fetchMateraEmails(): Promise<RawMateraEmail[]> {
-  const senderEmail = process.env.MATERA_SENDER_EMAIL
-  if (!senderEmail) throw new Error('MATERA_SENDER_EMAIL non défini dans .env')
+  let sciConfig: any = null
+  try {
+    sciConfig = await db.SciConfig.findOne()
+  } catch (_) {}
 
-  const config = {
+  const senderEmail = sciConfig?.matera_sender_email || process.env.MATERA_SENDER_EMAIL
+  if (!senderEmail) throw new Error('MATERA_SENDER_EMAIL non configuré')
+
+  const imapConfig = {
     imap: {
-      host: process.env.IMAP_HOST || '',
-      port: parseInt(process.env.IMAP_PORT || '993', 10),
-      tls: process.env.IMAP_TLS !== 'false',
-      user: process.env.IMAP_USER || '',
-      password: process.env.IMAP_PASS || '',
+      host: sciConfig?.imap_host || process.env.IMAP_HOST || '',
+      port: sciConfig?.imap_port ?? parseInt(process.env.IMAP_PORT || '993', 10),
+      tls: sciConfig?.imap_tls ?? (process.env.IMAP_TLS !== 'false'),
+      user: sciConfig?.imap_user || process.env.IMAP_USER || '',
+      password: sciConfig?.imap_pass || process.env.IMAP_PASS || '',
       authTimeout: 10000,
       tlsOptions: { rejectUnauthorized: false },
     },
@@ -26,7 +33,7 @@ export async function fetchMateraEmails(): Promise<RawMateraEmail[]> {
 
   let connection: ImapSimple | null = null
   try {
-    connection = await imapSimple.connect(config)
+    connection = await imapSimple.connect(imapConfig)
     await connection.openBox('INBOX')
 
     const searchCriteria = [['FROM', senderEmail]]
@@ -56,3 +63,4 @@ export async function fetchMateraEmails(): Promise<RawMateraEmail[]> {
     connection?.end()
   }
 }
+

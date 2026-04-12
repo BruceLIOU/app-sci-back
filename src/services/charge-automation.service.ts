@@ -19,16 +19,21 @@ export interface SyncResult {
 export async function runMateraChargeSync(): Promise<SyncResult> {
   const result: SyncResult = { processed: 0, created: 0, skipped: 0, errors: [] }
 
-  // Valider que le bien configuré existe réellement en base
-  const rawPropertyId = process.env.MATERA_PROPERTY_ID
+  // Lire matera_property_id depuis la DB (fallback sur l'env)
+  let sciConfig: any = null
+  try {
+    sciConfig = await db.SciConfig.findOne()
+  } catch (_) {}
+
+  const rawPropertyId = sciConfig?.matera_property_id ?? process.env.MATERA_PROPERTY_ID
   let propertyId: number | null = null
   if (rawPropertyId) {
-    const parsed = parseInt(rawPropertyId, 10)
+    const parsed = parseInt(String(rawPropertyId), 10)
     const exists = await Property.findByPk(parsed, { attributes: ['id'] })
     if (exists) {
       propertyId = parsed
     } else {
-      console.warn(`[MATERA SYNC] MATERA_PROPERTY_ID=${rawPropertyId} introuvable en base — la charge sera créée sans bien associé.`)
+      console.warn(`[MATERA SYNC] matera_property_id=${rawPropertyId} introuvable en base — la charge sera créée sans bien associé.`)
     }
   }
 

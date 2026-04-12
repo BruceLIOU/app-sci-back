@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { startCron } from '../services/cron-manager.service'
 
 const db = require('../models')
 
@@ -23,6 +24,10 @@ exports.update = async (req: Request, res: Response) => {
     } else {
       await config.update(fields)
     }
+    // Recharger le cron si le schedule ou l'activation ont changé
+    const schedule = config.charge_cron_schedule || '0 8 * * *'
+    const enabled = config.charge_cron_enabled !== false
+    startCron(schedule, enabled)
     res.json(config)
   } catch (e: any) {
     res.status(500).json({ message: e.message })

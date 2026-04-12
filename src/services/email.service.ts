@@ -1,19 +1,30 @@
 import nodemailer from 'nodemailer'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+const db = require('../models')
+
+async function createTransporter() {
+  let config: any = null
+  try {
+    config = await db.SciConfig.findOne()
+  } catch (_) {}
+  const appName = process.env.APP_NAME || 'App SCI'
+  const host = config?.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com'
+  const port = config?.smtp_port ?? parseInt(process.env.SMTP_PORT || '587', 10)
+  const secure = config?.smtp_secure ?? (process.env.SMTP_SECURE === 'true')
+  const user = config?.smtp_user || process.env.SMTP_USER
+  const pass = config?.smtp_pass || process.env.SMTP_PASS
+  const from = config?.smtp_from || process.env.SMTP_FROM || user
+  return {
+    transport: nodemailer.createTransport({ host, port, secure, auth: { user, pass } }),
+    from: `"${appName}" <${from}>`,
+  }
+}
 
 export async function sendInvitationEmail(to: string, activationLink: string): Promise<void> {
+  const { transport, from } = await createTransporter()
   const appName = process.env.APP_NAME || 'App SCI'
-  await transporter.sendMail({
-    from: `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await transport.sendMail({
+    from,
     to,
     subject: `Invitation à rejoindre ${appName}`,
     html: `
@@ -45,9 +56,9 @@ export async function sendPdfByEmail(
   html: string,
   attachment: { filename: string; content: Buffer },
 ): Promise<void> {
-  const appName = process.env.APP_NAME || 'App SCI'
-  await transporter.sendMail({
-    from: `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  const { transport, from } = await createTransporter()
+  await transport.sendMail({
+    from,
     to,
     subject,
     html,
@@ -56,9 +67,10 @@ export async function sendPdfByEmail(
 }
 
 export async function sendLoginEmail(to: string, loginLink: string): Promise<void> {
+  const { transport, from } = await createTransporter()
   const appName = process.env.APP_NAME || 'App SCI'
-  await transporter.sendMail({
-    from: `"${appName}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+  await transport.sendMail({
+    from,
     to,
     subject: `Votre lien de connexion - ${appName}`,
     html: `

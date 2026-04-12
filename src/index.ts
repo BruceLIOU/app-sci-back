@@ -2,9 +2,8 @@ import express, { Application, Request, Response } from 'express'
 import formidable from 'express-formidable'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
-import cron from 'node-cron'
 import { requireAuth } from './middleware/auth.middleware'
-import { runMateraChargeSync } from './services/charge-automation.service'
+import { startCron } from './services/cron-manager.service'
 
 require('dotenv').config()
 
@@ -21,16 +20,17 @@ app.use(cookieParser())
 const db = require('./models')
 db.sequelize
   .sync({ alter: true })
-  .then(() => {
+  .then(async () => {
     console.log('🟢 Connexion à la base de données réussie !')
-    const schedule = process.env.CHARGE_CRON_SCHEDULE || '0 8 * * *'
-    cron.schedule(schedule, () => {
-      console.log('[MATERA SYNC] Déclenchement cron...')
-      runMateraChargeSync().catch((err: Error) =>
-        console.error('[MATERA SYNC] Erreur inattendue :', err.message)
-      )
-    })
-    console.log(`🕐 Cron MATERA démarré (schedule: "${schedule}")`)
+    // Lire le cron depuis la DB (fallback sur les variables d'env)
+    let schedule = process.env.CHARGE_CRON_SCHEDULE || '0 8 * * *'
+    let enabled = true
+    try {
+      const config = await db.SciConfig.findOne()
+      if (config?.charge_cron_schedule) schedule = config.charge_cron_schedule
+      if (config && config.charge_cron_enabled === false) enabled = false
+    } catch (_) {}
+    startCron(schedule, enabled)
   })
   .catch((error: Error) => {
     console.log('🔴 Connexion à la base de données échouée !', error.message)
