@@ -1,16 +1,20 @@
 import express, { Application, Request, Response } from 'express'
 import formidable from 'express-formidable'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
+import { requireAuth } from './middleware/auth.middleware'
 
 require('dotenv').config()
 
 const app: Application = express()
 const corsOptions = {
-  origin: 'http://localhost:3001',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  credentials: true,
 }
 
 app.use(formidable({ multiples: true }))
 app.use(cors(corsOptions))
+app.use(cookieParser())
 
 const db = require('./models')
 db.sequelize
@@ -21,6 +25,12 @@ db.sequelize
   .catch((error: Error) => {
     console.log('🔴 Connexion à la base de données échouée !', error.message)
   })
+
+// Routes publiques (auth en premier, avant le middleware)
+require('./routes/auth.routes')(app)
+
+// Middleware d'authentification pour toutes les routes suivantes
+app.use(requireAuth)
 
 require('./routes/property.routes')(app)
 require('./routes/tenant.routes')(app)
