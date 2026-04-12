@@ -27,6 +27,14 @@ module.exports = (sequelize: Sequelize, { DataTypes }: { DataTypes: typeof impor
       month: {
         type: DataTypes.STRING,
       },
+      lease_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      charges_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        defaultValue: 0,
+      },
     },
     {}
   )

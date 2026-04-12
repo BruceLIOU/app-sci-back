@@ -45,6 +45,10 @@ db.Lease.belongsTo(db.Property, { foreignKey: 'property_id' })
 db.Tenant.hasMany(db.Lease, { foreignKey: 'tenant_id', onDelete: 'CASCADE' })
 db.Lease.belongsTo(db.Tenant, { foreignKey: 'tenant_id' })
 
+// Lease ↔ Payment associations
+db.Lease.hasMany(db.Payment, { foreignKey: 'lease_id', onDelete: 'CASCADE' })
+db.Payment.belongsTo(db.Lease, { foreignKey: 'lease_id' })
+
 // Charge associations
 db.Property.hasMany(db.Charge, { foreignKey: 'property_id', onDelete: 'CASCADE' })
 db.Charge.belongsTo(db.Property, { foreignKey: 'property_id' })
