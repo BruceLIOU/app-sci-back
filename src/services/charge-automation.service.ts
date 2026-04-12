@@ -101,7 +101,7 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
 
     // Créer la charge
     try {
-      const newCharge = await Charge.create({
+      await Charge.create({
         property_id: propertyId,
         type: 'charges_copro',
         description: 'Appel de fonds MATERA (auto)',
@@ -111,13 +111,6 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
       })
 
       await ProcessedEmail.create({ message_id: email.messageId, processed_at: new Date() })
-
-      await createNotification({
-        type: 'matera_charge',
-        title: 'Charge MATERA créée automatiquement',
-        message: `Appel de fonds de ${parsed.amount} € — date : ${parsed.date}`,
-        metadata: { charge_id: newCharge.id, amount: parsed.amount, date: parsed.date, property_id: propertyId },
-      })
 
       console.log(`[MATERA SYNC] Charge créée : ${parsed.amount} € le ${parsed.date}`)
       result.created++
@@ -129,6 +122,31 @@ export async function runMateraChargeSync(): Promise<SyncResult> {
   }
 
   console.log(`[MATERA SYNC] Terminé — créées: ${result.created}, ignorées: ${result.skipped}, erreurs: ${result.errors.length}`)
+
+  // Notification de bilan global
+  if (result.created === 0 && result.errors.length === 0) {
+    await createNotification({
+      type: 'matera_charge',
+      title: 'Synchronisation MATERA : aucune nouvelle charge',
+      message: `${result.processed} email(s) analysé(s) — aucune nouvelle charge à créer.`,
+      metadata: { processed: result.processed, created: 0, skipped: result.skipped },
+    })
+  } else if (result.errors.length > 0 && result.created === 0) {
+    await createNotification({
+      type: 'matera_charge',
+      title: 'Synchronisation MATERA : erreur(s) rencontrée(s)',
+      message: `${result.errors[0]}`,
+      metadata: { processed: result.processed, created: result.created, skipped: result.skipped, errors: result.errors },
+    })
+  } else if (result.created > 0) {
+    await createNotification({
+      type: 'matera_charge',
+      title: `Synchronisation MATERA : ${result.created} charge(s) créée(s)`,
+      message: `${result.created} nouvelle(s) charge(s) créée(s) sur ${result.processed} email(s) analysé(s).`,
+      metadata: { processed: result.processed, created: result.created, skipped: result.skipped },
+    })
+  }
+
   return result
 }
 
