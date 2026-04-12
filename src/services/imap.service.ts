@@ -1,5 +1,6 @@
 import imapSimple, { ImapSimple, Message } from 'imap-simple'
 import { simpleParser, ParsedMail } from 'mailparser'
+import { decrypt } from '../utils/crypto.util'
 
 const db = require('../models')
 
@@ -25,7 +26,7 @@ export async function fetchMateraEmails(): Promise<RawMateraEmail[]> {
       port: sciConfig?.imap_port ?? parseInt(process.env.IMAP_PORT || '993', 10),
       tls: sciConfig?.imap_tls ?? (process.env.IMAP_TLS !== 'false'),
       user: sciConfig?.imap_user || process.env.IMAP_USER || '',
-      password: sciConfig?.imap_pass || process.env.IMAP_PASS || '',
+      password: (sciConfig?.imap_pass ? decrypt(sciConfig.imap_pass) : null) || process.env.IMAP_PASS || '',
       authTimeout: 10000,
       tlsOptions: { rejectUnauthorized: false },
     },

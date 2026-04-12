@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { decrypt } from '../utils/crypto.util'
 
 const db = require('../models')
 
@@ -12,7 +13,7 @@ async function createTransporter() {
   const port = config?.smtp_port ?? parseInt(process.env.SMTP_PORT || '587', 10)
   const secure = config?.smtp_secure ?? (process.env.SMTP_SECURE === 'true')
   const user = config?.smtp_user || process.env.SMTP_USER
-  const pass = config?.smtp_pass || process.env.SMTP_PASS
+  const pass = (config?.smtp_pass ? decrypt(config.smtp_pass) : null) || process.env.SMTP_PASS
   const from = config?.smtp_from || process.env.SMTP_FROM || user
   return {
     transport: nodemailer.createTransport({ host, port, secure, auth: { user, pass } }),
