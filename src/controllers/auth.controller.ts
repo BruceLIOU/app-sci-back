@@ -168,6 +168,12 @@ exports.updatePreferences = async (req: Request, res: Response) => {
     // Fusionner les préférences envoyées
     const updated = { ...current }
     if (f.darkMode !== undefined) updated.darkMode = f.darkMode === 'true'
+    if (f.onboardingGoogleConnectionVerified !== undefined) {
+      updated.onboardingGoogleConnectionVerified = f.onboardingGoogleConnectionVerified === 'true'
+    }
+    if (f.onboardingEmailConnectionVerified !== undefined) {
+      updated.onboardingEmailConnectionVerified = f.onboardingEmailConnectionVerified === 'true'
+    }
     await user.update({ preferences: JSON.stringify(updated) })
     res.json({ preferences: updated })
   } catch (e: any) {
