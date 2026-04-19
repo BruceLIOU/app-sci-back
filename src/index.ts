@@ -8,7 +8,7 @@ import express, {
 } from "express";
 import formidable from "express-formidable";
 import { requireAuth } from "./middleware/auth.middleware";
-import { startCron } from "./services/cron-manager.service";
+import { startCron, startDailyAlerts } from "./services/cron-manager.service";
 import { initWss } from "./services/ws.service";
 
 require("dotenv").config();
@@ -37,6 +37,7 @@ db.sequelize
 			if (config && config.charge_cron_enabled === false) enabled = false;
 		} catch (_) {}
 		startCron(schedule, enabled);
+		startDailyAlerts();
 	})
 	.catch((error: Error) => {
 		console.log("🔴 Connexion à la base de données échouée !", error.message);
@@ -62,6 +63,7 @@ require("./routes/owner_config.routes")(app);
 require("./routes/visit.routes")(app);
 require("./routes/user.routes")(app);
 require("./routes/notification.routes")(app);
+require("./routes/maintenance.routes")(app);
 
 app.get("/", (req: Request, res: Response) => {
 	res.status(200).json("🟢  Welcome to Pilotage Immo API");
