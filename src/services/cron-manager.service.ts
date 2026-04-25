@@ -27,8 +27,9 @@ export function startCron(schedule: string, enabled = true): void {
 	);
 }
 
-export function startDailyAlerts(): void {
+export function startDailyAlerts(enabled = true): void {
 	if (dailyAlertsCronTask) return;
+	if (!enabled) return;
 
 	// Daily at 8:30am — lease expiry alerts and payment reminders
 	dailyAlertsCronTask = cron.schedule("30 8 * * *", () => {
@@ -40,7 +41,18 @@ export function startDailyAlerts(): void {
 			console.error("[PAYMENT REMINDERS] Erreur :", err.message),
 		);
 	});
-	console.log("🕐 Cron alertes quotidiennes démarré (8h30)");
+	console.log(
+		`🕐 Cron alertes quotidiennes démarré (8h30, activé: ${enabled})`,
+	);
+}
+
+export function reloadDailyAlerts(enabled: boolean): void {
+	if (dailyAlertsCronTask) {
+		dailyAlertsCronTask.stop();
+		dailyAlertsCronTask = null;
+	}
+	if (enabled) startDailyAlerts(true);
+	else console.log("🛑 Cron alertes quotidiennes désactivé");
 }
 
 export function stopCron(): void {

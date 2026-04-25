@@ -68,6 +68,10 @@ module.exports = (
 				type: DataTypes.STRING,
 				defaultValue: "30,90",
 			},
+			payment_reminder_enabled: {
+				type: DataTypes.BOOLEAN,
+				defaultValue: true,
+			},
 		},
 		{
 			tableName: "OwnerConfigs",
