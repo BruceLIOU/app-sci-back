@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { createNotification } from "../services/notification.service";
 
 const db = require("../models");
 
@@ -153,6 +154,18 @@ exports.createMaintenance = async (req: Request, res: Response) => {
 			status: "open",
 			reported_at: new Date().toISOString().slice(0, 10),
 		});
+
+		await createNotification({
+			type: "maintenance_report",
+			title: "Nouveau signalement locataire",
+			message: title as string,
+			metadata: {
+				maintenance_id: item.id,
+				tenant_id: tenantId,
+				property_id: tenant.property_id,
+			},
+		});
+
 		res.status(201).json(item);
 	} catch (e: any) {
 		res.status(500).json({ message: e.message });

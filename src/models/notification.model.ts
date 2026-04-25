@@ -13,6 +13,7 @@ module.exports = (
 					"email_sent",
 					"lease_expiry",
 					"payment_reminder",
+					"maintenance_report",
 				),
 				allowNull: false,
 			},

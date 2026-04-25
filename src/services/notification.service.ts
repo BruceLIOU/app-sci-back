@@ -8,7 +8,8 @@ export interface NotificationData {
 		| "lease_expiry"
 		| "payment_reminder"
 		| "lease_renewal"
-		| "lease_termination";
+		| "lease_termination"
+		| "maintenance_report";
 	title: string;
 	message?: string;
 	metadata?: Record<string, any>;
