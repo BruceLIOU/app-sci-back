@@ -4,11 +4,22 @@ import { createNotification } from "./notification.service";
 
 const db = require("../models");
 
-// Reminders sent at J+5, J+15, J+30 after due date
-const REMINDER_DAYS = [5, 15, 30];
+const DEFAULT_REMINDER_DAYS = [5, 15, 30];
 
 export async function sendPaymentReminders(): Promise<void> {
 	const now = new Date();
+
+	// Load configurable thresholds from owner config
+	let REMINDER_DAYS = DEFAULT_REMINDER_DAYS;
+	try {
+		const config = await db.OwnerConfig.findOne();
+		if (config?.payment_reminder_days) {
+			REMINDER_DAYS = config.payment_reminder_days
+				.split(",")
+				.map((s: string) => Number.parseInt(s.trim(), 10))
+				.filter((n: number) => !Number.isNaN(n));
+		}
+	} catch (_) {}
 
 	let payments: any[] = [];
 	try {

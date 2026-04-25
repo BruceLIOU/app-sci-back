@@ -64,6 +64,7 @@ require("./routes/visit.routes")(app);
 require("./routes/user.routes")(app);
 require("./routes/notification.routes")(app);
 require("./routes/maintenance.routes")(app);
+require("./routes/provider.routes")(app);
 
 app.get("/", (req: Request, res: Response) => {
 	res.status(200).json("🟢  Welcome to Pilotage Immo API");

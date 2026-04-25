@@ -4,11 +4,22 @@ import { createNotification } from "./notification.service";
 
 const db = require("../models");
 
-// Notify at exactly 90 and 30 days (checked daily — window of ±1 day)
-const ALERT_THRESHOLDS = [90, 30];
+const DEFAULT_ALERT_THRESHOLDS = [90, 30];
 
 export async function checkLeaseExpiries(): Promise<void> {
 	const now = new Date();
+
+	// Load configurable thresholds from owner config
+	let ALERT_THRESHOLDS = DEFAULT_ALERT_THRESHOLDS;
+	try {
+		const config = await db.OwnerConfig.findOne();
+		if (config?.lease_expiry_alert_days) {
+			ALERT_THRESHOLDS = config.lease_expiry_alert_days
+				.split(",")
+				.map((s: string) => Number.parseInt(s.trim(), 10))
+				.filter((n: number) => !Number.isNaN(n));
+		}
+	} catch (_) {}
 
 	let leases: any[] = [];
 	try {

@@ -59,6 +59,15 @@ module.exports = (
 			},
 			email_template_lease_expiry: { type: DataTypes.TEXT, allowNull: true },
 			email_template_quittance: { type: DataTypes.TEXT, allowNull: true },
+			// Configurable alert thresholds
+			payment_reminder_days: {
+				type: DataTypes.STRING,
+				defaultValue: "5,15,30",
+			},
+			lease_expiry_alert_days: {
+				type: DataTypes.STRING,
+				defaultValue: "30,90",
+			},
 		},
 		{
 			tableName: "OwnerConfigs",

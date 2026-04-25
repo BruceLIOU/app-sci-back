@@ -31,6 +31,7 @@ db.User = require("./user.model")(sequelize, Sequelize);
 db.ProcessedEmail = require("./processed-email.model")(sequelize, Sequelize);
 db.Notification = require("./notification.model")(sequelize, Sequelize);
 db.Maintenance = require("./maintenance.model")(sequelize, Sequelize);
+db.Provider = require("./provider.model")(sequelize, Sequelize);
 
 // Property associations
 db.Property.hasMany(db.Tenant, {

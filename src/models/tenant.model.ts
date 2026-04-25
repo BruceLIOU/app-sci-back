@@ -57,6 +57,7 @@ module.exports = (
 			guarantor_address: { type: DataTypes.STRING, allowNull: true },
 			guarantor_zipcode: { type: DataTypes.STRING, allowNull: true },
 			guarantor_city: { type: DataTypes.STRING, allowNull: true },
+			monthly_income: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
 		},
 		{},
 	);
