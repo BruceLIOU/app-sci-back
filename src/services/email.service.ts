@@ -1,46 +1,57 @@
-import nodemailer from 'nodemailer'
-import archiver from 'archiver'
-import { decrypt } from '../utils/crypto.util'
+import archiver from "archiver";
+import nodemailer from "nodemailer";
+import { decrypt } from "../utils/crypto.util";
 
-const db = require('../models')
+const db = require("../models");
 
 async function createTransporter() {
-  let config: any = null
-  try {
-    config = await db.OwnerConfig.findOne()
-  } catch (_) {}
-  const appName = process.env.APP_NAME || 'Pilotage Immo'
-  const host = config?.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com'
-  const port = config?.smtp_port ?? parseInt(process.env.SMTP_PORT || '587', 10)
-  const secure = config?.smtp_secure ?? (process.env.SMTP_SECURE === 'true')
-  const user = config?.smtp_user || process.env.SMTP_USER
-  const pass = (config?.smtp_pass ? decrypt(config.smtp_pass) : null) || process.env.SMTP_PASS
-  const from = config?.smtp_from || process.env.SMTP_FROM || user
-  return {
-    transport: nodemailer.createTransport({ host, port, secure, auth: { user, pass } }),
-    from: `"${appName}" <${from}>`,
-  }
+	let config: any = null;
+	try {
+		config = await db.OwnerConfig.findOne();
+	} catch (_) {}
+	const appName = process.env.APP_NAME || "Pilotage Immo";
+	const host = config?.smtp_host || process.env.SMTP_HOST || "smtp.gmail.com";
+	const port =
+		config?.smtp_port ?? Number.parseInt(process.env.SMTP_PORT || "587", 10);
+	const secure = config?.smtp_secure ?? process.env.SMTP_SECURE === "true";
+	const user = config?.smtp_user || process.env.SMTP_USER;
+	const pass =
+		(config?.smtp_pass ? decrypt(config.smtp_pass) : null) ||
+		process.env.SMTP_PASS;
+	const from = config?.smtp_from || process.env.SMTP_FROM || user;
+	return {
+		transport: nodemailer.createTransport({
+			host,
+			port,
+			secure,
+			auth: { user, pass },
+		}),
+		from: `"${appName}" <${from}>`,
+	};
 }
 
 export async function testSmtpConnection(to: string): Promise<void> {
-  const { transport, from } = await createTransporter()
-  await transport.verify()
-  await transport.sendMail({
-    from,
-    to,
-    subject: 'Test SMTP - Pilotage Immo',
-    html: '<p>Connexion SMTP validee avec succes.</p>',
-  })
+	const { transport, from } = await createTransporter();
+	await transport.verify();
+	await transport.sendMail({
+		from,
+		to,
+		subject: "Test SMTP - Pilotage Immo",
+		html: "<p>Connexion SMTP validee avec succes.</p>",
+	});
 }
 
-export async function sendInvitationEmail(to: string, activationLink: string): Promise<void> {
-  const { transport, from } = await createTransporter()
-  const appName = process.env.APP_NAME || 'Pilotage Immo'
-  await transport.sendMail({
-    from,
-    to,
-    subject: `Invitation à rejoindre ${appName}`,
-    html: `
+export async function sendInvitationEmail(
+	to: string,
+	activationLink: string,
+): Promise<void> {
+	const { transport, from } = await createTransporter();
+	const appName = process.env.APP_NAME || "Pilotage Immo";
+	await transport.sendMail({
+		from,
+		to,
+		subject: `Invitation à rejoindre ${appName}`,
+		html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2d6a4f;">Vous avez été invité(e) à rejoindre ${appName}</h2>
         <p>Un administrateur vous a invité(e) à accéder à l'application de gestion SCI.</p>
@@ -60,63 +71,148 @@ export async function sendInvitationEmail(to: string, activationLink: string): P
         </p>
       </div>
     `,
-  })
+	});
 }
 
 export async function sendPdfByEmail(
-  to: string,
-  subject: string,
-  html: string,
-  attachment: { filename: string; content: Buffer },
+	to: string,
+	subject: string,
+	html: string,
+	attachment: { filename: string; content: Buffer },
 ): Promise<void> {
-  const { transport, from } = await createTransporter()
-  await transport.sendMail({
-    from,
-    to,
-    subject,
-    html,
-    attachments: [{ filename: attachment.filename, content: attachment.content, contentType: 'application/pdf' }],
-  })
+	const { transport, from } = await createTransporter();
+	await transport.sendMail({
+		from,
+		to,
+		subject,
+		html,
+		attachments: [
+			{
+				filename: attachment.filename,
+				content: attachment.content,
+				contentType: "application/pdf",
+			},
+		],
+	});
 }
 
-export function buildZipBuffer(files: { filename: string; content: Buffer }[]): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 9 } })
-    const chunks: Buffer[] = []
-    archive.on('data', (chunk: Buffer) => chunks.push(chunk))
-    archive.on('end', () => resolve(Buffer.concat(chunks)))
-    archive.on('error', reject)
-    for (const f of files) {
-      archive.append(f.content, { name: f.filename })
-    }
-    archive.finalize()
-  })
+export function buildZipBuffer(
+	files: { filename: string; content: Buffer }[],
+): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const archive = archiver("zip", { zlib: { level: 9 } });
+		const chunks: Buffer[] = [];
+		archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+		archive.on("end", () => resolve(Buffer.concat(chunks)));
+		archive.on("error", reject);
+		for (const f of files) {
+			archive.append(f.content, { name: f.filename });
+		}
+		archive.finalize();
+	});
 }
 
 export async function sendZipByEmail(
-  to: string,
-  subject: string,
-  html: string,
-  attachment: { filename: string; content: Buffer },
+	to: string,
+	subject: string,
+	html: string,
+	attachment: { filename: string; content: Buffer },
 ): Promise<void> {
-  const { transport, from } = await createTransporter()
-  await transport.sendMail({
-    from,
-    to,
-    subject,
-    html,
-    attachments: [{ filename: attachment.filename, content: attachment.content, contentType: 'application/zip' }],
-  })
+	const { transport, from } = await createTransporter();
+	await transport.sendMail({
+		from,
+		to,
+		subject,
+		html,
+		attachments: [
+			{
+				filename: attachment.filename,
+				content: attachment.content,
+				contentType: "application/zip",
+			},
+		],
+	});
 }
 
-export async function sendLoginCodeEmail(to: string, loginCode: string, expiresInMinutes: number): Promise<void> {
-  const { transport, from } = await createTransporter()
-  const appName = process.env.APP_NAME || 'Pilotage Immo'
-  await transport.sendMail({
-    from,
-    to,
-    subject: `Votre code de connexion - ${appName}`,
-    html: `
+export async function sendLeaseRenewalEmail(
+	to: string,
+	tenantName: string,
+	propertyAddress: string,
+	oldEndDate: string,
+	newEndDate: string,
+): Promise<void> {
+	const { transport, from } = await createTransporter();
+	const appName = process.env.APP_NAME || "Pilotage Immo";
+	const fmt = (d: string) => new Date(d).toLocaleDateString("fr-FR");
+	await transport.sendMail({
+		from,
+		to,
+		subject: `Renouvellement de votre bail - ${appName}`,
+		html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2d6a4f;">Renouvellement de bail</h2>
+        <p>Bonjour ${tenantName},</p>
+        <p>Votre bail pour le bien <strong>${propertyAddress}</strong> a été renouvelé.</p>
+        <table style="border-collapse: collapse; width: 100%; margin: 24px 0;">
+          <tr>
+            <td style="padding: 8px 12px; border: 1px solid #d8e5db; color: #666;">Ancienne date de fin</td>
+            <td style="padding: 8px 12px; border: 1px solid #d8e5db; font-weight: bold;">${fmt(oldEndDate)}</td>
+          </tr>
+          <tr style="background: #f3f7f4;">
+            <td style="padding: 8px 12px; border: 1px solid #d8e5db; color: #666;">Nouvelle date de fin</td>
+            <td style="padding: 8px 12px; border: 1px solid #d8e5db; font-weight: bold; color: #2d6a4f;">${fmt(newEndDate)}</td>
+          </tr>
+        </table>
+        <p style="color: #666; font-size: 14px;">Pour toute question, contactez votre bailleur.</p>
+      </div>
+    `,
+	});
+}
+
+export async function sendLeaseTerminationEmail(
+	to: string,
+	tenantName: string,
+	propertyAddress: string,
+	terminationDate: string,
+	reason?: string,
+): Promise<void> {
+	const { transport, from } = await createTransporter();
+	const appName = process.env.APP_NAME || "Pilotage Immo";
+	const fmt = (d: string) => new Date(d).toLocaleDateString("fr-FR");
+	await transport.sendMail({
+		from,
+		to,
+		subject: `Résiliation de votre bail - ${appName}`,
+		html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #c0392b;">Résiliation de bail</h2>
+        <p>Bonjour ${tenantName},</p>
+        <p>Votre bail pour le bien <strong>${propertyAddress}</strong> a été résilié.</p>
+        <table style="border-collapse: collapse; width: 100%; margin: 24px 0;">
+          <tr>
+            <td style="padding: 8px 12px; border: 1px solid #f5c6cb; color: #666;">Date de résiliation</td>
+            <td style="padding: 8px 12px; border: 1px solid #f5c6cb; font-weight: bold;">${fmt(terminationDate)}</td>
+          </tr>
+          ${reason ? `<tr style="background: #fff5f5;"><td style="padding: 8px 12px; border: 1px solid #f5c6cb; color: #666;">Motif</td><td style="padding: 8px 12px; border: 1px solid #f5c6cb;">${reason}</td></tr>` : ""}
+        </table>
+        <p style="color: #666; font-size: 14px;">Pour toute question, contactez votre bailleur.</p>
+      </div>
+    `,
+	});
+}
+
+export async function sendLoginCodeEmail(
+	to: string,
+	loginCode: string,
+	expiresInMinutes: number,
+): Promise<void> {
+	const { transport, from } = await createTransporter();
+	const appName = process.env.APP_NAME || "Pilotage Immo";
+	await transport.sendMail({
+		from,
+		to,
+		subject: `Votre code de connexion - ${appName}`,
+		html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2d6a4f;">Connexion à ${appName}</h2>
         <p>Vous avez demandé un code de connexion. Saisissez ce code dans l'application pour accéder à votre compte :</p>
@@ -135,5 +231,5 @@ export async function sendLoginCodeEmail(to: string, loginCode: string, expiresI
         </p>
       </div>
     `,
-  })
+	});
 }

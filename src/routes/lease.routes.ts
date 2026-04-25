@@ -15,4 +15,6 @@ module.exports = (app: Application) => {
 	app.delete("/api/leases/:id", controller.delete);
 	app.get("/api/leases/:lease_id/irl-simulate", controller.simulateIrl);
 	app.post("/api/leases/:lease_id/irl-apply", controller.applyIrl);
+	app.post("/api/leases/:lease_id/renew", controller.renew);
+	app.post("/api/leases/:lease_id/terminate", controller.terminate);
 };

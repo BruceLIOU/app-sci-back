@@ -2,7 +2,13 @@ const db = require("../models");
 import { broadcastNotification } from "./ws.service";
 
 export interface NotificationData {
-	type: "matera_charge" | "email_sent" | "lease_expiry" | "payment_reminder";
+	type:
+		| "matera_charge"
+		| "email_sent"
+		| "lease_expiry"
+		| "payment_reminder"
+		| "lease_renewal"
+		| "lease_termination";
 	title: string;
 	message?: string;
 	metadata?: Record<string, any>;

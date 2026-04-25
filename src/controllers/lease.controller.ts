@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import cloudinary from "../config/cloudinary.config";
+import {
+	sendLeaseRenewalEmail,
+	sendLeaseTerminationEmail,
+} from "../services/email.service";
 import { calculateIrlRevision, fetchLatestIrl } from "../services/irl.service";
+import { createNotification } from "../services/notification.service";
 const db = require("../models");
 const { Lease, Property, Tenant } = db;
 const Document = db.Document;
@@ -19,6 +24,61 @@ const MOIS_FR = [
 	"Novembre",
 	"Décembre",
 ];
+
+async function schedulePaymentsFrom(
+	lease: any,
+	fromDate: string | null,
+	toDate: string,
+	t: any,
+) {
+	const refStart = new Date(lease.start_date);
+	const day = refStart.getDate();
+	// Start from the month after fromDate (avoids duplicating existing payments)
+	const pivotDate = fromDate ? new Date(fromDate) : refStart;
+	const scheduleStart = new Date(
+		pivotDate.getFullYear(),
+		pivotDate.getMonth() + 1,
+		1,
+	);
+	const endDate = new Date(toDate);
+
+	const rentAmount = Number.parseFloat(lease.rent_amount);
+	const chargesAmount = Number.parseFloat(lease.charges_amount || 0);
+	const amount = (rentAmount + chargesAmount).toFixed(2);
+
+	const toCreate: Promise<any>[] = [];
+	const cur = new Date(
+		scheduleStart.getFullYear(),
+		scheduleStart.getMonth(),
+		1,
+	);
+	const last = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+	while (cur <= last) {
+		const y = cur.getFullYear();
+		const m = cur.getMonth();
+		const daysInMonth = new Date(y, m + 1, 0).getDate();
+		const dueDay = String(Math.min(day, daysInMonth)).padStart(2, "0");
+		const due_date = `${y}-${String(m + 1).padStart(2, "0")}-${dueDay}`;
+		toCreate.push(
+			db.Payment.create(
+				{
+					tenant_id: lease.tenant_id || null,
+					property_id: lease.property_id || null,
+					lease_id: lease.id,
+					amount,
+					charges_amount: chargesAmount.toFixed(2),
+					due_date,
+					month: `${MOIS_FR[m]} ${y}`,
+					status: "pending",
+				},
+				{ transaction: t },
+			),
+		);
+		cur.setMonth(m + 1);
+	}
+	await Promise.all(toCreate);
+}
 
 async function schedulePayments(lease: any, t: any) {
 	const startDate = new Date(lease.start_date);
@@ -251,6 +311,97 @@ exports.applyIrl = async (req: Request, res: Response) => {
 			new_rent: newRent,
 			irl: currentIrl,
 		});
+	} catch (e: any) {
+		res.status(500).json({ message: e.message });
+	}
+};
+
+exports.renew = async (req: Request, res: Response) => {
+	const { lease_id } = req.params;
+	const new_end_date = req.fields?.new_end_date as string;
+	if (!new_end_date)
+		return res
+			.status(400)
+			.json({ message: "Nouvelle date de fin obligatoire." });
+	try {
+		const lease = await Lease.findByPk(lease_id, { include });
+		if (!lease) return res.status(404).json({ message: "Bail introuvable." });
+		if (lease.status !== "active")
+			return res
+				.status(400)
+				.json({ message: "Seul un bail actif peut être renouvelé." });
+
+		const oldEndDate = lease.end_date as string | null;
+		await db.sequelize.transaction(async (t: any) => {
+			await lease.update({ end_date: new_end_date }, { transaction: t });
+			await schedulePaymentsFrom(lease, oldEndDate, new_end_date, t);
+		});
+
+		if (lease.Tenant?.email) {
+			const name =
+				`${lease.Tenant.civility || ""} ${lease.Tenant.firstname} ${lease.Tenant.lastname}`.trim();
+			const addr = `${lease.Property?.type || ""} - ${lease.Property?.address || ""}, ${lease.Property?.city || ""}`;
+			sendLeaseRenewalEmail(
+				lease.Tenant.email,
+				name,
+				addr,
+				oldEndDate || "",
+				new_end_date,
+			).catch(() => {});
+		}
+
+		await createNotification({
+			type: "lease_renewal",
+			title: "Bail renouvelé",
+			message: `Bail ${lease.Property?.city || ""} renouvelé jusqu'au ${new_end_date}`,
+			metadata: { lease_id: lease.id },
+		});
+
+		res
+			.status(200)
+			.json({ message: "Bail renouvelé avec succès.", new_end_date });
+	} catch (e: any) {
+		res.status(500).json({ message: e.message });
+	}
+};
+
+exports.terminate = async (req: Request, res: Response) => {
+	const { lease_id } = req.params;
+	const termination_date =
+		(req.fields?.termination_date as string) ||
+		new Date().toISOString().slice(0, 10);
+	const reason = (req.fields?.reason as string) || undefined;
+	try {
+		const lease = await Lease.findByPk(lease_id, { include });
+		if (!lease) return res.status(404).json({ message: "Bail introuvable." });
+		if (lease.status !== "active")
+			return res
+				.status(400)
+				.json({ message: "Seul un bail actif peut être résilié." });
+
+		await lease.update({ status: "terminated", end_date: termination_date });
+
+		if (lease.Tenant?.email) {
+			const name =
+				`${lease.Tenant.civility || ""} ${lease.Tenant.firstname} ${lease.Tenant.lastname}`.trim();
+			const addr = `${lease.Property?.type || ""} - ${lease.Property?.address || ""}, ${lease.Property?.city || ""}`;
+			sendLeaseTerminationEmail(
+				lease.Tenant.email,
+				name,
+				addr,
+				termination_date,
+				reason,
+			).catch(() => {});
+		}
+
+		await createNotification({
+			type: "lease_termination",
+			title: "Bail résilié",
+			message: `Bail ${lease.Property?.city || ""} résilié le ${termination_date}`,
+			metadata: { lease_id: lease.id },
+		});
+
+		res.status(200).json({ message: "Bail résilié.", termination_date });
 	} catch (e: any) {
 		res.status(500).json({ message: e.message });
 	}
