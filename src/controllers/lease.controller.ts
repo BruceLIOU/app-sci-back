@@ -249,6 +249,7 @@ exports.update = async (req: Request, res: Response) => {
 				notice_period,
 				status,
 				notes: notes || null,
+				pdf_generated_at: null, // PDF à re-générer après modification
 			},
 			{ where: { id: req.params.id } },
 		);

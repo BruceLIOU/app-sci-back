@@ -27,6 +27,8 @@ module.exports = (
 			email_sent_at: { type: DataTypes.DATE, allowNull: true },
 			irl_reference: { type: DataTypes.FLOAT, allowNull: true },
 			last_irl_revision: { type: DataTypes.DATEONLY, allowNull: true },
+			pdf_url: { type: DataTypes.STRING, allowNull: true },
+			pdf_generated_at: { type: DataTypes.DATE, allowNull: true },
 		},
 		{},
 	);
